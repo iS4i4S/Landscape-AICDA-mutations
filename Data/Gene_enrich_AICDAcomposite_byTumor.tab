@@ -1,0 +1,166 @@
+Hugo_Symbol	metamaintype	n_patients	n_composite	prop
+EGFR	Melanoma	37	0	0
+EGFR	Non-Small Cell Lung Cancer	931	10	0.0107411385606874
+EGFR	Breast Cancer	54	0	0
+EGFR	Soft Tissue Sarcoma	9	0	0
+EGFR	Colorectal Cancer	27	0	0
+EGFR	Pancreatic Cancer	11	0	0
+EGFR	Bladder Cancer	22	0	0
+EGFR	Endometrial Cancer	14	0	0
+EGFR	Glioma	191	17	0.0890052356020942
+EGFR	Cancer of Unknown Primary	16	0	0
+EGFR	Appendiceal Cancer	2	0	0
+EGFR	Bone Cancer	1	0	0
+EGFR	Renal Cell Carcinoma	4	0	0
+EGFR	Germ Cell Tumor	5	0	0
+EGFR	Ovarian Cancer	7	0	0
+EGFR	Salivary Gland Cancer	2	0	0
+EGFR	Small Cell Lung Cancer	19	0	0
+EGFR	Esophagogastric Cancer	12	0	0
+EGFR	Head and Neck Cancer	6	0	0
+EGFR	Skin Cancer, Non-Melanoma	4	0	0
+EGFR	Thyroid Cancer	1	0	0
+EGFR	Prostate Cancer	13	0	0
+EGFR	Peripheral Nervous System	2	0	0
+EGFR	Gastrointestinal Stromal Tumor	3	0	0
+EGFR	Hepatobiliary Cancer	8	0	0
+EGFR	Uterine Sarcoma	2	0	0
+FBXW7	Pancreatic Cancer	18	0	0
+FBXW7	Breast Cancer	30	0	0
+FBXW7	Bladder Cancer	38	1	0.0263157894736842
+FBXW7	Endometrial Cancer	114	0	0
+FBXW7	Ovarian Cancer	11	0	0
+FBXW7	Colorectal Cancer	273	18	0.0659340659340659
+FBXW7	Small Cell Lung Cancer	5	0	0
+FBXW7	Non-Small Cell Lung Cancer	71	1	0.0140845070422535
+FBXW7	Cancer of Unknown Primary	21	0	0
+FBXW7	Esophagogastric Cancer	29	2	0.0689655172413793
+FBXW7	Melanoma	35	1	0.0285714285714286
+FBXW7	Appendiceal Cancer	8	0	0
+FBXW7	Cervical Cancer	17	0	0
+FBXW7	Bone Cancer	2	0	0
+FBXW7	Head and Neck Cancer	25	0	0
+FBXW7	Renal Cell Carcinoma	5	0	0
+FBXW7	Peripheral Nervous System	1	0	0
+FBXW7	Gastrointestinal Stromal Tumor	3	0	0
+FBXW7	Salivary Gland Cancer	5	0	0
+FBXW7	Gastrointestinal Neuroendocrine Tumor	3	0	0
+FBXW7	Mesothelioma	9	0	0
+FBXW7	Hepatobiliary Cancer	10	0	0
+FBXW7	Soft Tissue Sarcoma	8	0	0
+FBXW7	Glioma	10	0	0
+FBXW7	Skin Cancer, Non-Melanoma	4	0	0
+FBXW7	Thyroid Cancer	1	0	0
+FBXW7	CNS Cancer	2	0	0
+FBXW7	Prostate Cancer	3	0	0
+FBXW7	Germ Cell Tumor	1	0	0
+FBXW7	Uterine Sarcoma	2	0	0
+FGFR3	Bladder Cancer	201	6	0.0298507462686567
+FGFR3	Glioma	11	0	0
+FGFR3	Ovarian Cancer	5	0	0
+FGFR3	Mesothelioma	1	0	0
+FGFR3	Melanoma	21	0	0
+FGFR3	Endometrial Cancer	3	0	0
+FGFR3	Colorectal Cancer	13	0	0
+FGFR3	Breast Cancer	18	0	0
+FGFR3	Skin Cancer, Non-Melanoma	5	0	0
+FGFR3	Non-Small Cell Lung Cancer	22	0	0
+FGFR3	Cancer of Unknown Primary	11	0	0
+FGFR3	Esophagogastric Cancer	3	0	0
+FGFR3	Prostate Cancer	5	0	0
+FGFR3	Pancreatic Cancer	3	0	0
+FGFR3	Soft Tissue Sarcoma	5	0	0
+FGFR3	Head and Neck Cancer	5	1	0.2
+FGFR3	Salivary Gland Cancer	1	0	0
+FGFR3	Renal Cell Carcinoma	6	0	0
+FGFR3	Bone Cancer	3	0	0
+FGFR3	Hepatobiliary Cancer	6	0	0
+FGFR3	Small Cell Lung Cancer	1	0	0
+FGFR3	Cervical Cancer	3	0	0
+PIK3CA	Salivary Gland Cancer	24	1	0.0416666666666667
+PIK3CA	Colorectal Cancer	445	10	0.0224719101123595
+PIK3CA	Breast Cancer	1561	63	0.0403587443946188
+PIK3CA	Esophagogastric Cancer	57	2	0.0350877192982456
+PIK3CA	Non-Small Cell Lung Cancer	248	6	0.0241935483870968
+PIK3CA	Endometrial Cancer	413	18	0.0435835351089588
+PIK3CA	Bladder Cancer	155	4	0.0258064516129032
+PIK3CA	Ovarian Cancer	83	1	0.0120481927710843
+PIK3CA	Glioma	142	2	0.0140845070422535
+PIK3CA	Head and Neck Cancer	79	2	0.0253164556962025
+PIK3CA	Hepatobiliary Cancer	39	0	0
+PIK3CA	Cervical Cancer	51	2	0.0392156862745098
+PIK3CA	Melanoma	28	0	0
+PIK3CA	Cancer of Unknown Primary	85	1	0.0117647058823529
+PIK3CA	Bone Cancer	8	0	0
+PIK3CA	Prostate Cancer	72	0	0
+PIK3CA	Pancreatic Cancer	44	0	0
+PIK3CA	Small Cell Lung Cancer	18	0	0
+PIK3CA	Germ Cell Tumor	13	0	0
+PIK3CA	Appendiceal Cancer	19	0	0
+PIK3CA	Renal Cell Carcinoma	20	0	0
+PIK3CA	Uterine Sarcoma	6	0	0
+PIK3CA	Soft Tissue Sarcoma	36	0	0
+PIK3CA	Skin Cancer, Non-Melanoma	24	1	0.0416666666666667
+PIK3CA	Thyroid Cancer	30	0	0
+PIK3CA	Gastrointestinal Neuroendocrine Tumor	3	0	0
+PIK3CA	Mesothelioma	5	0	0
+PIK3CA	Gastrointestinal Stromal Tumor	7	0	0
+PIK3CA	CNS Cancer	2	0	0
+PTEN	Melanoma	79	0	0
+PTEN	Glioma	334	1	0.0029940119760479
+PTEN	Germ Cell Tumor	17	0	0
+PTEN	Breast Cancer	273	1	0.00366300366300366
+PTEN	Prostate Cancer	127	0	0
+PTEN	Cancer of Unknown Primary	41	0	0
+PTEN	Soft Tissue Sarcoma	29	0	0
+PTEN	Ovarian Cancer	32	0	0
+PTEN	Endometrial Cancer	349	14	0.0401146131805158
+PTEN	Esophagogastric Cancer	17	0	0
+PTEN	Non-Small Cell Lung Cancer	125	0	0
+PTEN	Renal Cell Carcinoma	39	1	0.0256410256410256
+PTEN	Colorectal Cancer	82	0	0
+PTEN	Head and Neck Cancer	17	0	0
+PTEN	Pancreatic Cancer	27	0	0
+PTEN	Gastrointestinal Stromal Tumor	11	1	0.0909090909090909
+PTEN	Small Cell Lung Cancer	23	0	0
+PTEN	Cervical Cancer	16	2	0.125
+PTEN	Thyroid Cancer	33	0	0
+PTEN	Bladder Cancer	15	0	0
+PTEN	Mesothelioma	4	0	0
+PTEN	Hepatobiliary Cancer	13	1	0.0769230769230769
+PTEN	Gastrointestinal Neuroendocrine Tumor	3	0	0
+PTEN	Uterine Sarcoma	10	0	0
+PTEN	Salivary Gland Cancer	5	0	0
+PTEN	Bone Cancer	3	0	0
+PTEN	Skin Cancer, Non-Melanoma	5	0	0
+PTEN	Appendiceal Cancer	1	0	0
+TP53	Prostate Cancer	492	0	0
+TP53	Glioma	497	15	0.0301810865191147
+TP53	Endometrial Cancer	534	4	0.00749063670411985
+TP53	Pancreatic Cancer	1140	1	0.00087719298245614
+TP53	Non-Small Cell Lung Cancer	1988	12	0.00603621730382294
+TP53	Bladder Cancer	361	2	0.00554016620498615
+TP53	Ovarian Cancer	792	1	0.00126262626262626
+TP53	Breast Cancer	1714	6	0.00350058343057176
+TP53	CNS Cancer	3	0	0
+TP53	Colorectal Cancer	1986	19	0.00956696878147029
+TP53	Soft Tissue Sarcoma	240	4	0.0166666666666667
+TP53	Cancer of Unknown Primary	437	2	0.0045766590389016
+TP53	Renal Cell Carcinoma	76	1	0.0131578947368421
+TP53	Small Cell Lung Cancer	235	0	0
+TP53	Esophagogastric Cancer	590	8	0.0135593220338983
+TP53	Bone Cancer	56	0	0
+TP53	Hepatobiliary Cancer	262	0	0
+TP53	Head and Neck Cancer	207	9	0.0434782608695652
+TP53	Salivary Gland Cancer	65	0	0
+TP53	Thyroid Cancer	84	2	0.0238095238095238
+TP53	Melanoma	139	1	0.00719424460431655
+TP53	Gastrointestinal Neuroendocrine Tumor	31	0	0
+TP53	Germ Cell Tumor	57	0	0
+TP53	Uterine Sarcoma	80	3	0.0375
+TP53	Gastrointestinal Stromal Tumor	23	0	0
+TP53	Appendiceal Cancer	62	0	0
+TP53	Skin Cancer, Non-Melanoma	85	6	0.0705882352941176
+TP53	Cervical Cancer	26	1	0.0384615384615385
+TP53	Mesothelioma	35	1	0.0285714285714286
+TP53	Peripheral Nervous System	2	0	0
