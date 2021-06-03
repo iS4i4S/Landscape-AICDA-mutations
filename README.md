@@ -1,4 +1,4 @@
-# Landscape-AICDA-mutations
+# Landscape of AICDA mutations
 Code for reproducing analysis on the paper "Pan-cancer landscape of AID somatic related mutations and its potential role in the ICI response".
 #Graphical abstract later--> ![alt text](https://github.com/...png "Hi there!")
 
@@ -24,7 +24,8 @@ if(!c('DESeq2',"MutationalPatterns","maftools","dndscv","DoAbsolute","ABSOLUTE",
     BiocManager::install(c("DESeq2","MutationalPatterns","maftools","dndscv","DoAbsolute","ABSOLUTE","Palimpsest"))
 }
 ```
-The structure has the title regarding each section/paragraph within the manuscript and is divided in 3 folders:
+
+Each folder has the title regarding each section/paragraph within the manuscript and is divided in 3 folders:
   * Data: contains necessary information to load into an R session in order to reproduce analyses.
   * Rmarkdowns: contains Rmd files with the needed code to reproduce the panels within the main figures and some supplemental figures.
   * r: contains manual written codes needed to reproduce the analyses.
