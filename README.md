@@ -31,7 +31,8 @@ Each folder has the title regarding each section/paragraph within the manuscript
   * r: contains manual written codes needed to reproduce the analyses.
 
 
-
+### Data adquisition
+Due to data regulations, maf, cnv, rna-seq and other data from the TCGA, ICGC, Composite cohorts cannot be included in the git but can be directly downloaded from their databases, you can consult our article with the links for all the datasets.
 
 ### Citation
 - URL: 
