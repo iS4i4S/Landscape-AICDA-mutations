@@ -40,6 +40,20 @@ Each folder has the title regarding each Figure number (e.g.Figure1) within the 
   * Rmarkdowns: contains Rmd files with the needed code to reproduce the panels within the main figures and some supplemental figures.
   * r: contains manual written codes needed to reproduce the analyses.
 
+### HTMLs
+Generate HTML files containing graphics for each main figure from the command line, which can be viewed in your web browser:
+
+```bash
+R -e "rmarkdown::render('Rmarkdowns/Figure1.Rmd', output_file = 'figure-1.html')"
+R -e "rmarkdown::render('Rmarkdowns/Figure2.Rmd', output_file = 'figure-2.html')"
+R -e "rmarkdown::render('Rmarkdowns/Figure3.Rmd', output_file = 'figure-3.html')"
+R -e "rmarkdown::render('Rmarkdowns/Figure4.Rmd', output_file = 'figure-4.html')"
+R -e "rmarkdown::render('Rmarkdowns/Figure5.Rmd', output_file = 'figure-5.html')"
+R -e "rmarkdown::render('Rmarkdowns/Figure6.Rmd', output_file = 'figure-6.html')"
+R -e "rmarkdown::render('Rmarkdowns/Figure7.Rmd', output_file = 'figure-7.html')"
+```
+Alternatively, you can visualize the files by clicking on the coresponding links here:
+ * 
 
 ### Data adquisition
 Due to data regulations, maf, cnv, rna-seq and other data from the TCGA, ICGC, Composite cohorts cannot be included in the git but can be directly downloaded from their databases, you can consult our article with the links for all the datasets.
