@@ -1,0 +1,406 @@
+---
+output:
+  rmarkdown::html_document:
+    highlight: pygments
+    toc: true
+    css: style.css
+chunk_output_type: console
+header-includes:
+- \pagenumbering{gobble}
+params:
+    set_title: "Figure-2"
+title: "`r params$set_title`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, autodep = knitr::dep_prev())
+```
+
+***
+
+\pagebreak
+
+# Fig 2A
+
+```{r panel2A_cals,echo=T,eval=F,fig.show="hide"}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+#Figure 2A viral counts..
+###Download needed data from the original studies:
+# TCGA viral reads per million reads mapped to the human genome: https://www.cell.com/cms/10.1016/j.cell.2014.12.033/attachment/02c50887-85ca-46bd-ae9a-915ccc36bbf4/mmc2.xlsx
+#Clinical TCGA data http://api.gdc.cancer.gov/data/00a32f7a-c85f-4f86-850d-be53973cbc4d
+####Add immune variables
+#Download data from: https://cavei.github.io/example-datasets/panCancerAnnotation.RData 
+###
+#Load clinical data
+library(readxl)
+TCGA_clinical <- read_excel("/media/isaias.hernandez/seagate_ICM/AICDA_pancancer/TCGA-CDR-SupplementalTableS1.xlsx")
+TCGA_clinical<-as.data.frame(TCGA_clinical)
+
+# # using a TCGAutils function
+library(TCGAutils)
+   #TCGA codes
+bar_codes_pancancer$sample <- as.character(bar_codes_pancancer$sample) # TCGAutils needs to be as character
+bar_codes_pancancer$bcr_patient_barcode <- TCGAbarcode(bar_codes_pancancer$sample, participant = TRUE) # takes out some data from xbarcode that is not needed
+
+###Subset clinical data to contain only tumoral sample data from the RNA-seq
+  TCGA_clinical2<-subset(TCGA_clinical, (TCGA_clinical$bcr_patient_barcode %in%  bar_codes_pancancer$bcr_patient_barcode))
+
+####Add immune variables
+#Download data from: https://cavei.github.io/example-datasets/panCancerAnnotation.RData 
+load("panCancerAnnotation.RData")
+panCancerAnnotation2<-NULL
+for(i in 1:length(panCancerAnnotation)){
+    panCancerAnnotation2<-rbind(panCancerAnnotation2,panCancerAnnotation[[i]][,])
+  } #Transform list to compleate data.frame
+
+# change the format of the input file as most of the variables are considered as factors due to the use of "," as decimal.
+# save the dataframe as .txt
+write.table(panCancerAnnotation2, file = "/media/isaias.hernandez/seagate_ICM/AICDA_pancancer/panCancerAnnotation.txt", 
+            dec = ",", 
+            sep = "\t", 
+            quote = F, 
+            col.names = T, 
+            row.names = F)
+                                 
+# read it considering the "," as decimals
+panCancerAnnotation_corrected <- read.delim("/media/isaias.hernandez/seagate_ICM/AICDA_pancancer/panCancerAnnotation.txt", dec = ",")  
+
+
+
+panCancerAnnotation3<-subset(panCancerAnnotation_corrected, panCancerAnnotation_corrected$TCGA.Participant.Barcode %in% TCGA_clinical2$bcr_patient_barcode) #subset to same samples in TCGA_clinical2
+
+TCGA_clinical3<-subset(TCGA_clinical2, TCGA_clinical2$bcr_patient_barcode %in% panCancerAnnotation3$TCGA.Participant.Barcode) #Subset so they have the same info
+
+panCancerAnnotation3<-panCancerAnnotation3[order(factor(panCancerAnnotation3$TCGA.Participant.Barcode, levels = TCGA_clinical3$bcr_patient_barcode)),]#put in same order
+all(TCGA_clinical3$bcr_patient_barcode == panCancerAnnotation3$TCGA.Participant.Barcode)#must be true
+
+
+TCGA_clinical3<- cbind(TCGA_clinical3, panCancerAnnotation3) #add panCancerAnnotation data 
+
+
+
+TCGA_clinical3_logistic<-TCGA_clinical3
+
+##Import viral counts:
+###First load the table
+viral_load_data <- read_excel("LGM_models/viral_load/viral_load_data.xlsx")
+viral_load_data<-as.data.frame(viral_load_data)
+colnames(viral_load_data)[1]<-"sample"
+viral_load_data$sample <- as.character(viral_load_data$sample) # TCGAutils needs to be as character
+table(startsWith(toupper(viral_load_data$sample), "TCGA")) #Check if all starts with TCGA, no because there are some GTEX samples
+viral_load_data$bcr_patient_barcode<-NA
+
+ viral_load_data$bcr_patient_barcode[startsWith(toupper(viral_load_data$sample),"TCGA")]<-TCGAbarcode(viral_load_data$sample[startsWith(toupper(viral_load_data$sample), "TCGA")], participant = TRUE)
+viral_load_data$bcr_patient_barcode[!startsWith(toupper(viral_load_data$sample),"TCGA")]<-viral_load_data$sample[!startsWith(toupper(viral_load_data$sample), "TCGA")] # takes out some data from xbarcode that is not needed #add the bcr code system
+##Subset to same samples as TCGA_clinical3_logistic
+viral_load_data2<-viral_load_data[viral_load_data$bcr_patient_barcode %in% TCGA_clinical3_logistic$bcr_patient_barcode,]
+dim(viral_load_data2)
+
+# remove recurrence samples
+viral_load_data2 <-viral_load_data2[!duplicated(viral_load_data2$bcr_patient_barcode), ]
+    dim(viral_load_data2)
+    #Subset TCGA_clinical3_logistic to same as viral_load_data2
+TCGA_clinical3_logistic_viral<-TCGA_clinical3_logistic[TCGA_clinical3_logistic$bcr_patient_barcode %in% viral_load_data2$bcr_patient_barcode,]
+
+table(TCGA_clinical3_logistic_viral$type)
+ viral_load_data2<-viral_load_data2[order(factor(viral_load_data2$bcr_patient_barcode, levels = TCGA_clinical3_logistic_viral$bcr_patient_barcode)),] ##Put in the same order
+ all(TCGA_clinical3_logistic_viral$bcr_patient_barcode==viral_load_data2$bcr_patient_barcode) #Safety check, must be TRUE
+ 
+  ##Now add virus infection data as binary (where 1 = infected; 0= not infected). Viral infection is determined based on whether the expression exceeded the maximum observed in the GTEx normal
+ TCGA_clinical3_logistic_viral$EBV_status<-ifelse(viral_load_data2$EBV> max(viral_load_data$EBV[viral_load_data$Provenance %in% "GTEx"]),1,0) 
+  table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$EBV_status==1])
+
+  TCGA_clinical3_logistic_viral$HBV_status<-ifelse(viral_load_data2$HBV> max(viral_load_data$HBV[viral_load_data$Provenance %in% "GTEx"]),1,0) 
+  table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HBV_status==1]) 
+   BLCA CESC COAD HNSC KIRC  LGG LIHC THCA  #Mostly liver hepatocellular carcinoma
+  
+   
+TCGA_clinical3_logistic_viral$HCV_status<-ifelse(viral_load_data2$HCV> max(viral_load_data$HCV[viral_load_data$Provenance %in% "GTEx"]),1,0) 
+  table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HCV_status==1])    
+   HNSC LIHC #Mostly liver hepatocellular carcinoma
+ 
+ 
+   TCGA_clinical3_logistic_viral$HPV_status<-ifelse(viral_load_data2$HPV> max(viral_load_data$HPV[viral_load_data$Provenance %in% "GTEx"]),1,0) 
+  table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HPV_status==1])    
+  BLCA CESC COAD HNSC KIRC  LGG LUSC READ UCEC 
+#   5  151    6   39    2    3    1    1    8
+   
+ TCGA_clinical3_logistic_viral$Kaposi_status<-ifelse(viral_load_data2$Kaposi> max(viral_load_data$Kaposi[viral_load_data$Provenance %in% "GTEx"]),1,0) 
+  table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$Kaposi_status==1])   
+   #LUSC STAD 
+    #1    1  
+  TCGA_clinical3_logistic_viral$polyoma_status<-ifelse(viral_load_data2$polyoma_BK_virus> max(viral_load_data$polyoma_BK_virus[viral_load_data$Provenance %in% "GTEx"]) | viral_load_data2$polyoma_JC_virus> max(viral_load_data$polyoma_JC_virus[viral_load_data$Provenance %in% "GTEx"]) | viral_load_data2$polyoma_KI_virus> max(viral_load_data$polyoma_KI_virus[viral_load_data$Provenance %in% "GTEx"]) | viral_load_data2$polyoma_Merkel_cell> max(viral_load_data$polyoma_Merkel_cell[viral_load_data$Provenance %in% "GTEx"]) | viral_load_data2$polyoma_WU_virus> max(viral_load_data$polyoma_WU_virus[viral_load_data$Provenance %in% "GTEx"]),1,0) 
+  table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$polyoma_status==1]) 
+  
+    TCGA_clinical3_logistic_viral$Any_virus_status<-ifelse(TCGA_clinical3_logistic_viral$EBV_status==1 | TCGA_clinical3_logistic_viral$HBV_status==1 | TCGA_clinical3_logistic_viral$HCV_status==1 | TCGA_clinical3_logistic_viral$HPV_status==1 | TCGA_clinical3_logistic_viral$Kaposi_status==1 | TCGA_clinical3_logistic_viral$polyoma_status==1, 1,0)
+    table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$Any_virus_status==1]) #Get if infected by any type of virus
+ 
+    ##Add viral data as continuous variable
+TCGA_clinical3_logistic_viral$EBV<-viral_load_data2$EBV
+TCGA_clinical3_logistic_viral$HBV<-viral_load_data2$HBV
+TCGA_clinical3_logistic_viral$HCV<-viral_load_data2$HCV
+TCGA_clinical3_logistic_viral$HPV<-viral_load_data2$HPV
+TCGA_clinical3_logistic_viral<-cbind(TCGA_clinical3_logistic_viral,viral_load_data2[,7:11])
+
+##Add number of mutations
+TCGA_clinical3_logistic_viral$AICDA_mutations <-TCGA_clinical4$AICDA_mutations[TCGA_clinical4$bcr_patient_barcode %in% TCGA_clinical3_logistic_viral$bcr_patient_barcode]
+
+TCGA_clinical3_logistic$AICDA_mutations <-TCGA_clinical4$AICDA_mutations[TCGA_clinical4$bcr_patient_barcode %in% TCGA_clinical3_logistic$bcr_patient_barcode] #To complement graph
+
+TCGA_clinical3_logistic_viral$AICDA_exp_log<-log2(x=(TCGA_clinical3_logistic_viral$AICDA_exp+1))
+   TCGA_clinical3_logistic_viral$AICDA_mutations_log<-log2(x=(TCGA_clinical3_logistic_viral$AICDA_mutations+1))
+TCGA_clinical3_logistic$AICDA_exp_log<-log2(x=(TCGA_clinical3_logistic$AICDA_exp+1))
+   TCGA_clinical3_logistic$AICDA_mutations_log<-log2(x=(TCGA_clinical3_logistic$AICDA_mutations+1))
+##  
+   
+   
+
+```
+
+```{r panel_2A, fig.width=24,fig.height=14,fig.show=T}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#Import data
+##Import data
+TCGA_clinical3_logistic_viral<-as.data.frame(read.delim("Data/Figure2/Figure2A_C.tab"))
+
+####Final,barplot/boxplot showing differences
+
+#A) Fraction of samples with positive infection for each virus (barplot)
+###Get data
+   
+samples_virus<-names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$Any_virus_status==1]))
+samples_virus_fraction<-as.data.frame(matrix(data = 0,nrow = length(samples_virus),ncol = 6,dimnames = list(samples_virus,c("EBV","HBV","HCV","HPV","Kaposi","Polyoma"))))  
+samples_virus_fraction$Tumor_type<-rownames(samples_virus_fraction)
+
+ samples_virus_fraction[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$EBV_status==1])),1]<- table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$EBV_status==1])/table(TCGA_clinical3_logistic_viral$type[])[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$EBV_status==1]))]
+ samples_virus_fraction[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HBV_status==1])),2]<- table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HBV_status==1])/table(TCGA_clinical3_logistic_viral$type[])[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HBV_status==1]))] 
+  
+  samples_virus_fraction[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HCV_status==1])),3]<- table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HCV_status==1])/table(TCGA_clinical3_logistic_viral$type[])[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HCV_status==1]))] 
+  
+ samples_virus_fraction[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HPV_status==1])),4]<- table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HPV_status==1])/table(TCGA_clinical3_logistic_viral$type[])[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$HPV_status==1]))] 
+  
+  samples_virus_fraction[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$Kaposi_status==1])),5]<- table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$Kaposi_status==1])/table(TCGA_clinical3_logistic_viral$type[])[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$Kaposi_status==1]))] 
+  
+ samples_virus_fraction[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$polyoma_status==1])),6]<- table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$polyoma_status==1])/table(TCGA_clinical3_logistic_viral$type[])[names(table(TCGA_clinical3_logistic_viral$type[TCGA_clinical3_logistic_viral$polyoma_status==1]))]  
+  
+ samples_virus_fraction$n_samples<-table(TCGA_clinical3_logistic_viral$type[])[samples_virus_fraction$Tumor_type]
+ 
+ samples_virus_fraction2<- melt(data =samples_virus_fraction,id.vars=c("Tumor_type","n_samples"))
+ colnames(samples_virus_fraction2)<-c("Tumor_type", "n_sample","Virus","Fraction_samples")
+ samples_virus_fraction2$label<-samples_virus_fraction2$n_sample*samples_virus_fraction2$Fraction_samples
+ 
+  samples_virus_fraction2<-samples_virus_fraction2[samples_virus_fraction2$Fraction_samples>0,]
+samples_virus_fraction2$label<-paste0("n = ", samples_virus_fraction2$label)
+     
+p_A_virus<-ggplot(samples_virus_fraction2, aes(x =Tumor_type , y = Fraction_samples, fill = Tumor_type))+geom_bar(stat = "identity", position = "stack", color="black")+facet_wrap(facets = vars(Virus),nrow = 1,scales="free_x")+scale_y_continuous(limits=c(0,1))+geom_text(aes(label=label), vjust=-0.3, size=3.5)+labs( x="Tumor type", y = "Fraction of positive samples")+ theme_classic()
+ 
+
+p_A_virus 
+```
+
+***
+
+\pagebreak
+
+# Fig 2B
+
+
+```{r panel_2B, fig.width=18,fig.height=10.5,fig.show=T}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#Import data
+##Import data
+##Import data
+TCGA_clinical3_logistic_viral<-as.data.frame(read.delim("Data/Figure2/Figure2A_C.tab"))
+
+####Final,barplot/boxplot showing differences
+#B)Median comparison (within samples tested positive n>4) using boxplot
+ 
+p_virus1<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% "STAD",],x ="EBV_status" , y = "AICDA_exp_log",add = "jitter",color = "EBV_status",facet.by = "type")+stat_compare_means(method = "wilcox.test", aes(group = EBV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+scale_y_continuous(limits = c(2,max(TCGA_clinical3_logistic_viral$AICDA_exp_log)))+labs( x="EBV infection", y = "Log2 (AICDA expression + 1)")+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+p_virus2<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% c("LIHC"),],x ="HBV_status" , y = "AICDA_exp_log",add = "jitter",color = "HBV_status",facet.by = "type")+stat_compare_means(method = "wilcox.test", aes(group = HBV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+labs( x="HBV infection", y = "Log2 (AICDA expression + 1)")+theme(axis.title.y = element_blank(),axis.line.y =  element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank())+scale_y_continuous(limits = c(2,max(TCGA_clinical3_logistic_viral$AICDA_exp_log)))+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+p_virus3<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% c("LIHC"),],x ="HCV_status" , y = "AICDA_exp_log",add = "jitter",color = "HCV_status",facet.by = "type")+stat_compare_means(method = "wilcox.test", aes(group = HCV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+labs( x="HCV infection", y = "Log2 (AICDA expression + 1)")+theme(axis.title.y = element_blank(),axis.line.y =  element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank())+scale_y_continuous(limits = c(2,max(TCGA_clinical3_logistic_viral$AICDA_exp_log)))+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+p_virus4<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% c("BLCA" ,"CESC", "COAD", "HNSC", "UCEC"),],x ="HPV_status" , y = "AICDA_exp_log",add = "jitter",color = "HPV_status",facet.by = "type")+facet_wrap(facets = vars(type),nrow = 1,scales="free_x")+stat_compare_means(method = "wilcox.test", aes(group = HPV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+labs( x="HPV infection", y = "Log2 (AICDA expression + 1)")+theme(axis.title.y = element_blank(),axis.line.y =  element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank())+scale_y_continuous(limits = c(2,max(TCGA_clinical3_logistic_viral$AICDA_exp_log)))+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+
+p_virus_exp<-ggarrange(p_virus1,p_virus2,p_virus3,p_virus4,ncol = 4,nrow = 1,common.legend = T,widths = c(.2,.16,.16,.48),legend = "right")
+
+p_virus_exp
+```
+
+***
+
+\pagebreak
+
+# Fig 2C
+
+```{r panel_2C, fig.width=18,fig.height=10.5,fig.show=T}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#Import data
+##Import data
+##Import data
+TCGA_clinical3_logistic_viral<-as.data.frame(read.delim("Data/Figure2/Figure2A_C.tab"))
+
+####Final,barplot/boxplot showing differences
+
+###Now for the mutation_number related to AICDA
+
+p_virus5<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% "STAD",],x ="EBV_status" , y = "AICDA_mutations_log",add = "jitter",color = "EBV_status",facet.by = "type")+stat_compare_means(method = "wilcox.test", aes(group = EBV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+scale_y_continuous(limits = c(.5,max(TCGA_clinical3_logistic_viral$AICDA_mutations_log)))+labs( x="EBV infection", y = "Log2 (AICDA mutation number + 1)")+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+p_virus6<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% c("LIHC"),],x ="HBV_status" , y = "AICDA_mutations_log",add = "jitter",color = "HBV_status",facet.by = "type")+stat_compare_means(method = "wilcox.test", aes(group = HBV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+labs( x="HBV infection", y = "Log2 (AICDA mutation number + 1)")+theme(axis.title.y = element_blank(),axis.line.y =  element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank())+scale_y_continuous(limits = c(.5,max(TCGA_clinical3_logistic_viral$AICDA_mutations_log)))+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+p_virus7<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% c("LIHC"),],x ="HCV_status" , y = "AICDA_mutations_log",add = "jitter",color = "HCV_status",facet.by = "type")+stat_compare_means(method = "wilcox.test", aes(group = HCV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+labs( x="HCV infection", y = "Log2 (AICDA mutation number + 1)")+theme(axis.title.y = element_blank(),axis.line.y =  element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank())+scale_y_continuous(limits = c(.5,max(TCGA_clinical3_logistic_viral$AICDA_mutations_log)))+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+p_virus8<-ggboxplot(TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% c("BLCA" ,"CESC", "COAD", "HNSC", "UCEC"),],x ="HPV_status" , y = "AICDA_mutations_log",add = "jitter",color = "HPV_status",facet.by = "type")+facet_wrap(facets = vars(type),nrow = 1,scales="free_x")+stat_compare_means(method = "wilcox.test", aes(group = HPV_status),label = "p.format",label.x = 1.5)+ theme_classic()+scale_x_discrete(labels=c("-","+"))+labs( x="HPV infection", y = "Log2 (AICDA mutation number + 1)")+theme(axis.title.y = element_blank(),axis.line.y =  element_blank(),axis.text.y = element_blank(),axis.ticks.y = element_blank())+scale_y_continuous(limits = c(.5,max(TCGA_clinical3_logistic_viral$AICDA_mutations_log)))+ guides(color=guide_legend(title = "Infection Status",labels=c("-","+")))+scale_color_discrete(labels=c("-","+"), breaks=c(0,1))
+
+
+p_virus_muts<-ggarrange(p_virus5,p_virus6,p_virus7,p_virus8,ncol = 4,nrow = 1, common.legend = T,widths = c(.2,.16,.16,.48),legend = "right")
+p_virus_muts
+```
+
+***
+
+\pagebreak
+
+# Fig 2D
+
+```{r panel2D_cals,echo=T,eval=F,fig.show="hide"}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+##Spearman correlations with AICDA mutations and different immune variables...
+#Must have run previous chunks...
+##Do it using the number of ACIDA mutations
+    ##
+ tmp2<-cor.test.p_2(data = TCGA_clinical3_logistic[TCGA_clinical3_logistic$type %in% Tumor_type[-c(12)],c(3,35:39,46,48,60,61,72:94,100,127,51)],extract = "AICDA_mutations_log",method="spearman")
+  #Some tumor correlates with aneuploidy and Homologous.Recombination.Defects
+    tmp2_rvals<-cor.test.cor(data = TCGA_clinical3_logistic[TCGA_clinical3_logistic$type %in% Tumor_type[-c(12)],c(3,35:39,46,48,60,61,72:94,100,127,51)],extract = "AICDA_mutations_log",method="spearman")
+   
+    ##For viral load
+   
+    tmp2_viral<-cor.test.p_2(data = TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% Tumor_type[],c(3,132:143,62:65)],extract = "AICDA_mutations",method="spearman")
+  #Now r2 values
+    tmp2_viral_rvals<-cor.test.cor(data = TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% Tumor_type[],c(3,132:143,62:65)],extract = "AICDA_mutations",method="spearman")
+    
+    ##Concatenate and add missing tumor type ""LAML""
+    pvals_aicdamuts<-rbind(tmp2, matrix(data=NA,nrow=1,ncol=ncol(tmp2),dimnames = list("LAML",colnames(tmp2))))
+     pvals_aicdamuts<-merge(pvals_aicdamuts, tmp2_viral, by=0, all=TRUE)
+     rownames( pvals_aicdamuts)<- pvals_aicdamuts$Row.names
+     pvals_aicdamuts<- pvals_aicdamuts[,-1]
+    pvals_aicdamuts<-pvals_aicdamuts[order(factor(rownames(pvals_aicdamuts), levels = Tumor_type)),]#Reordenate according to previous order
+    ##Now do for the rvals
+    rvals_aicdamuts<-rbind(tmp2_rvals, matrix(data=NA,nrow=1,ncol=ncol(tmp2_rvals),dimnames = list("LAML",colnames(tmp2_rvals))))
+     rvals_aicdamuts<-merge(rvals_aicdamuts, tmp2_viral_rvals, by=0, all=TRUE)
+     rownames( rvals_aicdamuts)<- rvals_aicdamuts$Row.names
+     rvals_aicdamuts<- rvals_aicdamuts[,-1]
+    rvals_aicdamuts<-rvals_aicdamuts[order(factor(rownames(rvals_aicdamuts), levels = Tumor_type)),]
+    
+     ###Graph data
+    
+
+
+```
+
+```{r panel_2D, fig.width=24,fig.height=18,fig.show=T}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#Import data
+##Import data
+rvals_aicdamuts<-as.data.frame(read.delim("Data/Figure2/Figure2D_1.tab"))
+pvals_aicdamuts<-as.data.frame(read.delim("Data/Figure2/Figure2D_2.tab"))
+###Graph
+corrplot(is.corr = T,corr = as.matrix(rvals_aicdamuts[,-c(33,34,40,46:47)]),na.label = "square",na.label.col="white",col = brewer.pal(n = 8, name = "RdYlBu"), tl.col = "black", order = "original", tl.cex = 0.7,p.mat = as.matrix( pvals_aicdamuts[,-c(33,34,40,46:47)]),sig.level = c(.001, .01, .05), pch.cex = .7, pch.col = "black",insig = "label_sig",title="\n\nAICDA number of mutations (Log2+1) spearman correlation with \ndifferent variables across cancer types",method = "circle")
+p_spearman_aicdamuts<-recordPlot()
+
+p_spearman_aicdamuts
+
+```
+
+***
+
+\pagebreak
+
+# Fig 2E
+
+```{r panel2E_cals,echo=T,eval=F,fig.show="hide"}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+##Spearman correlations with AICDA mutations and different immune variables...
+#Must have run previous chunks...
+##Do it using the number of ACIDA expression
+##Now using the AICDA expression, previously done, just do for missing data (viral data)
+ 
+ ####
+ ###
+ tmp2<-cor.test.p_2(data = TCGA_clinical3_logistic[TCGA_clinical3_logistic$type %in% Tumor_type[-c(12)],c(3,36:39,46,48,51,60,61,72:94,126)],extract = "AICDA_exp_log",method="spearman")
+  #Some tumor correlates with aneuploidy and Homologous.Recombination.Defects
+    tmp2_rvals<-cor.test.cor(data = TCGA_clinical3_logistic[TCGA_clinical3_logistic$type %in% Tumor_type[-c(12)],c(3,36:39,46,48,51,60,61,72:94,126)],extract = "AICDA_exp_log",method="spearman")
+   
+    ##For viral load
+   
+    tmp2_viral<-cor.test.p_2(data = TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% Tumor_type[],c(3,62:65,132:135,137:142)],extract = "AICDA_exp_log",method="spearman")
+  #Now r2 values
+    tmp2_viral_rvals<-cor.test.cor(data = TCGA_clinical3_logistic_viral[TCGA_clinical3_logistic_viral$type %in% Tumor_type[],c(3,62:65,132:135,137:142)],extract = "AICDA_exp_log",method="spearman")
+    colnames(tmp2_viral)
+
+    ##Concatenate and add missing tumor type ""LAML""
+    
+     pvals_aicdaexp<-rbind(tmp2, matrix(data=NA,nrow=1,ncol=ncol(tmp2),dimnames = list("LAML",colnames(tmp2))))
+     pvals_aicdaexp<-merge(pvals_aicdaexp[,-33], tmp2_viral[,-14], by=0, all=TRUE)
+     rownames( pvals_aicdaexp)<- pvals_aicdaexp$Row.names
+     pvals_aicdaexp<- pvals_aicdaexp[,-1]
+    pvals_aicdaexp<-pvals_aicdaexp[order(factor(rownames(pvals_aicdaexp), levels = Tumor_type)),]#Reordenate according to previous order
+    ##Now do for the rvals
+    rvals_aicdaexp<-rbind(tmp2_rvals, matrix(data=NA,nrow=1,ncol=ncol(tmp2_rvals),dimnames = list("LAML",colnames(tmp2_rvals))))
+     rvals_aicdaexp<-merge(rvals_aicdaexp[,-33], tmp2_viral_rvals[,-14], by=0, all=TRUE)
+     rownames( rvals_aicdaexp)<- rvals_aicdaexp$Row.names
+     rvals_aicdaexp<- rvals_aicdaexp[,-1]
+    rvals_aicdaexp<-rvals_aicdaexp[order(factor(rownames(rvals_aicdaexp), levels = Tumor_type)),]
+    
+    
+```
+
+```{r panel_2E, fig.width=24,fig.height=18,fig.show=T}
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#Import data
+##Import data
+##Import data
+rvals_aicdaexp<-as.data.frame(read.delim("Data/Figure2/Figure2E_1.tab"))
+pvals_aicdaexp<-as.data.frame(read.delim("Data/Figure2/Figure2E_2.tab"))
+###Graph
+corrplot(is.corr = T,corr = as.matrix(rvals_aicdaexp[,]),na.label = "square",na.label.col="white",col = brewer.pal(n = 8, name = "RdYlBu"), tl.col = "black", order = "original", tl.cex = 0.7,p.mat = as.matrix( pvals_aicdaexp[,]),sig.level = c(.001, .01, .05), pch.cex = .7, pch.col = "black",insig = "label_sig",title="\n\nLog2(AICDA expression+1) spearman correlation with \ndifferent variables across cancer types",method = "circle")
+p_spearman_aicdaexp<-recordPlot()
+    
+p_spearman_aicdaexp
+
+```
+
+***
+
+\pagebreak
+
+
