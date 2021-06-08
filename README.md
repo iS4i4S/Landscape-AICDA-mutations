@@ -53,7 +53,14 @@ R -e "rmarkdown::render('Rmarkdowns/Figure6.Rmd', output_file = 'figure-6.html')
 R -e "rmarkdown::render('Rmarkdowns/Figure7.Rmd', output_file = 'figure-7.html')"
 ```
 Alternatively, you can visualize the files by clicking on the coresponding links here:
- * 
+ * [Figure1.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure1.html).
+ * [Figure2.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure2.html).
+ * [Figure3.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure3.html).
+ * [Figure4.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure4.html).
+ * [Figure5.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure5.html).
+ * [Figure6.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure6.html).
+ * [Figure7C.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure7C.html).
+ * [Figure7.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure7.html).
 
 ### Data adquisition
 Due to data regulations, maf, cnv, rna-seq and other data from the TCGA, ICGC, Composite cohorts cannot be included in the git but can be directly downloaded from their databases, you can consult our article with the links for all the datasets.
