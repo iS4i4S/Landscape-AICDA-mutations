@@ -1,4 +1,4 @@
-# Landscape of AICDA mutations
+# Landscape of AID mutations
 Code for reproducing analysis on the paper "Pan-cancer landscape of AID somatic related mutations and its potential role in the ICI response".
 #Graphical abstract later--> ![alt text](https://github.com/...png "Hi there!")
 
