@@ -19,9 +19,9 @@ new.packages <- required.packages[!(required.packages %in% installed.packages()[
 if(length(new.packages)>0) install.packages(new.packages)
 
 ## install packages from Bioconductor if not installed
-if(!c('DESeq2',"TCGAutils","MutationalPatterns","maftools","dndscv","DoAbsolute","Palimpsest","BiocOncoTK","seqinr","TxDb.Hsapiens.UCSC.hg19.knownGene","org.Hs.eg.db","genefilter","Biobase","DOSE") %in% installed.packages()) {
+if(!c('DESeq2',"TCGAutils","MutationalPatterns","maftools","dndscv","Palimpsest","BiocOncoTK","seqinr","TxDb.Hsapiens.UCSC.hg19.knownGene","org.Hs.eg.db","genefilter","Biobase","DOSE") %in% installed.packages()) {
     if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-    BiocManager::install(c("DESeq2","TCGAutils","BiocOncoTK","MutationalPatterns","maftools","dndscv","DoAbsolute","Palimpsest","seqinr","TxDb.Hsapiens.UCSC.hg19.knownGene","org.Hs.eg.db","genefilter","Biobase","DOSE","enrichplot"))
+    BiocManager::install(c("DESeq2","TCGAutils","BiocOncoTK","MutationalPatterns","maftools","dndscv","Palimpsest","seqinr","TxDb.Hsapiens.UCSC.hg19.knownGene","org.Hs.eg.db","genefilter","Biobase","DOSE","enrichplot"))
 }
  ```
   * Install MAESTRO (Model-based AnalysEs of Single-cell Transcriptome and RegulOme) by following the specifications on the original github page from [liulab-dfci](https://github.com/liulab-dfci/MAESTRO).
