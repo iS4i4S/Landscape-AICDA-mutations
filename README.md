@@ -25,7 +25,7 @@ if(!c('DESeq2',"TCGAutils","MutationalPatterns","maftools","dndscv","Palimpsest"
 }
  ```
   * Install MAESTRO (Model-based AnalysEs of Single-cell Transcriptome and RegulOme) by following the specifications on the original github page from [liulab-dfci](https://github.com/liulab-dfci/MAESTRO).
-  * Install ABSOLUTE by logging into Broad cga website: https://software.broadinstitute.org/cancer/cga then download and install https://software.broadinstitute.org/cancer/cga/sites/default/files/data/tools/absolute/ABSOLUTE_1.0.6.tar.gz. Then:
+  * Install ABSOLUTE by logging into Broad cga website: https://software.broadinstitute.org/cancer/cga then download and install the file "ABSOLUTE_1.0.6.tar.gz" Then:
  ```r
   install.packages("ABSOLUTE_1.0.6.tar.gz", repos = NULL, type = "source")
  ```
