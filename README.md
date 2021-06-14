@@ -65,7 +65,7 @@ Alternatively, you can visualize the files by clicking on the coresponding links
  * [Figure1.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure1.html).
  * [Figure2.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure2.html).
  * [Figure3.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure3.html).
- * Figure 3B and Figure 3E: Code for graphs was generated in python using the [Figure3B.py](https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/MutationAggregate.py) which uses and input data generated from Figure3.html (section Figure 3B). Additional information can be found through this [github page from Akdemir Lab](https://github.com/akdemirlab/MutationalDistribution).
+ * Figure 3B and Figure 3E: Code for graphs was generated in python using the [Figure3B.py](https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/MutationAggregate.py) which uses as input data generated from Figure3.html (section Figure 3B). Additional information can be found through this [github page from Akdemir Lab](https://github.com/akdemirlab/MutationalDistribution).
  * [Figure4.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure4.html).
  * [Figure5.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure5.html).
  * [Figure6.html](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Figure6.html).
