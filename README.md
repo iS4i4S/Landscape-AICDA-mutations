@@ -50,7 +50,7 @@ Each folder has the title regarding each Figure number (e.g.Figure1) within the 
   * r: contains manual written codes needed to reproduce the analyses.
 
 ### HTMLs
-Generate HTML files containing graphics for each main figure from the command line, which can be viewed in your web browser:
+Generate HTML files containing graphics for each main figure from the command line, which can be viewed in your web browser (just need to change the paths to your folder containing the data within each Rmd before launching):
 
 ```bash
 R -e "rmarkdown::render('Rmarkdowns/Figure1.Rmd', output_file = 'figure-1.html')"
