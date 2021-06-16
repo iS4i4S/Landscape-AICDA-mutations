@@ -20,50 +20,6 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, autodep = k
 
 \pagebreak
 
-# Fig 5A
-
-Pending 
-
-```{r panel5A_cals,echo=T,eval=F,fig.show="hide"}
-##Import data
-data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
-setwd(data_dir)
-source("r/prerequisites.R")
-```
-
-```{r panel_5A, fig.width=20,fig.height=18}
-##Import data
-data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
-setwd(data_dir)
-source("r/prerequisites.R")
-```
-
-***
-
-\pagebreak
-
-# Fig 5B
-
-Pending 
-
-```{r panel5B_cals,echo=T,eval=F,fig.show="hide"}
-##Import data
-data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
-setwd(data_dir)
-source("r/prerequisites.R")
-```
-
-```{r panel_5B, fig.width=20,fig.height=18}
-##Import data
-data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
-setwd(data_dir)
-source("r/prerequisites.R")
-```
-
-***
-
-\pagebreak
-
 # Fig 5C
 
 
