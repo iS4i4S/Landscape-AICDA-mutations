@@ -38,7 +38,6 @@ To reproduce the Figures, each oncogenic dataset was recovered from the files li
 library(Seurat)
 library(ggplot2)
 library(ggpubr)
-library(Rmagic)
 library(MAESTRO)
 ###Setwd to where you downloaded the data set, 
 setwd("TISCH_scRNA_datasets/CRC_GSE146771/")
@@ -255,6 +254,7 @@ col_tumor_type = c("ALL"="brown4","AML"="darkorange4","BCC"="gray","BRCA"="hotpi
 tmp_tumortype<-data.frame(tumor=rep(single_cell_design2$Tumor_type,3),row.names = rownames(ss_cellcycle2_norm2))
 cell_cycle = data.frame(phase = factor(c(rep("G1",40), rep("S",40), rep("G2M",40)), levels = c("G1", "S", "G2M")),row.names = rownames(ss_cellcycle2_norm2))
 color = c("#66C2A5", "#FC8D62", "#8DA0CB")
+col_fun3 = colorRamp2(c(1.8,.5,.1,0.001,0), c("firebrick",scales::alpha("darkorange",.8),"yellow2","grey","ivory"))
 
 
 ####Annotations first
