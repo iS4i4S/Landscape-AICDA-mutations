@@ -1,0 +1,666 @@
+---
+output:
+  rmarkdown::html_document:
+    highlight: pygments
+    toc: true
+    css: style.css
+chunk_output_type: console
+header-includes:
+- \pagenumbering{gobble}
+params:
+    set_title: "Figure-2"
+title: "`r params$set_title`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, autodep = knitr::dep_prev())
+```
+
+***
+
+\pagebreak
+
+# Fig 2a and 2b
+
+We downloaded the RepliSeq measurements (as wavelet-smoothed signal, ile SM923451_hg19_wgEncodeUwRepliSeqGm12878WaveSignalRep1.bigWig) of 11 ENCODE cell lines (SK-N-SH = neuroblastoma; MCF-7 = mammary gland adenocarcinoma; BJ = skin fibroblast; NHEK = epidermal keratinocytes; HepG2 = liver carcinoma; IMR90 = fetal lung fibroblasts; K562 = leukemia; HeLa-S3 = cervical carcinoma; GM12878 = lymphoblastoid; HUVEC = umbilical vein endothelial cells; BG02ES = embryonic stem cell; ) from the UCSC Genome Browser (also available in NCBI GEO as GSE34399). To avoid biasing the sample, we excluded multiple lymphoblastoid cell lines and retained Gm12878 as a representative, which was previously described in [Differential DNA mismatch repair underlies mutation rate variation across the human genome] and [Sequencing newly replicated DNA reveals widespread plasticity in human replication timing]. We computed the average RepliSeq signal within 1Mb genome windows of the remaining 11 cell lines (cross-tissue replication timing signal), having resulting values that ranged from 0-100, where higher values indicate earlier replication.
+
+**Creating the 1 MB windows**: 
+
+First the exon coding regions where extracted using the [UCSC browser](http://genome.ucsc.edu/cgi-bin/hgTables?command=start), options track: UCSC Genes; table: knownGene; output format: BED - browser extensible data; option Exons. Then using bedtools we masked blacklisted regions defined by Anshul Kundage and Duke [bed file here](http://genome.ucsc.edu/cgi-bin/hgTrackUi?hgsid=876251189_lEwmtar4Jcr1MJgh92cL5gL9Anaa&g=wgEncodeDacMapabilityConsensusExcludable). Then we generated 1 Mb windows covering all the genome and calculated the effective exonic length (EEL) within each window for determining SNS densities (SNV counts in each window multiplied the by EEL fraction) to get SNS per MB. Furthermore, replication timing is known to be
+organized in megabase-scale domains.
+
+**Calculations:**
+
+```{r panel2ab_cals,echo=T,eval=F,fig.show="hide"}
+###Calculations for Replication timing..
+bed_exonCoding<-import("Data/Figure2/Raw_Calculations/bedfilesForBins/bedfilesForBins/codingExons_hg19_NOblacklist.bed")
+bed_exonCoding
+seqnames(bed_exonCoding)
+tmp<-as.data.frame(bed_exonCoding)
+table(tmp$seqnames)
+paste0("chr",seq(1,22,1))
+bed_exonCoding<-keepSeqlevels(bed_exonCoding,c(paste0("chr",seq(1,22,1)),"chrX"),pruning.mode="coarse")
+seqnames(bed_exonCoding)
+bed_exonCoding
+GenomeInfoDb::seqlengths(bed_exonCoding)
+require(GenomicRanges)
+require(ggbio)
+require(BSgenome.Hsapiens.UCSC.hg19)
+
+chr.lengths = seqlengths(Hsapiens)[1:23]
+names(chr.lengths)<-c(paste0("chr",seq(1,22,1)),"chrX")
+chr.lengths
+seqlengths(bed_exonCoding)<-chr.lengths
+bed_exonCoding
+seqlengths(bed_exonCoding)
+bins <- GenomicRanges::tileGenome(GenomeInfoDb::seqlengths(bed_exonCoding), tilewidth=1000000, cut.last.tile.in.chrom=TRUE)
+bins
+seqinfo(Hsapiens)
+
+
+##
+#####Now import repliSeq data from each cell line, combine and get median score
+# repli-seq analysis
+library(rtracklayer)
+library(hwglabr2)
+
+##Import as GRanges object all the repliseq data, download from: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE34399
+
+RepliSeq_SKNSH <- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923441_hg19_wgEncodeUwRepliSeqSknshWaveSignalRep1.bigWig")
+RepliSeq_MCF<- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923442_hg19_wgEncodeUwRepliSeqMcf7WaveSignalRep1.bigWig")
+RepliSeq_BJ<- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923444_hg19_wgEncodeUwRepliSeqBjWaveSignalRep2.bigWig")
+RepliSeq_NHEK<- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923445_hg19_wgEncodeUwRepliSeqNhekWaveSignalRep1.bigWig")
+RepliSeq_HEPG<- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923446_hg19_wgEncodeUwRepliSeqHepg2WaveSignalRep1.bigWig")
+RepliSeq_IMR<- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923447_hg19_wgEncodeUwRepliSeqImr90WaveSignalRep1.bigWig")
+RepliSeq_K<- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923448_hg19_wgEncodeUwRepliSeqK562WaveSignalRep1.bigWig")
+RepliSeq_HELA<- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923449_hg19_wgEncodeUwRepliSeqHelas3WaveSignalRep1.bigWig")
+
+RepliSeq_GM <- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923451_hg19_wgEncodeUwRepliSeqGm12878WaveSignalRep1.bigWig")
+RepliSeq_HUVEC <- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923452_hg19_wgEncodeUwRepliSeqHuvecWaveSignalRep1.bigWig")
+RepliSeq_BG <- import("Data/Figure2/Raw_Calculations/CellLines_repliData/GSM923453_hg19_wgEncodeUwRepliSeqBg02esWaveSignalRep1.bigWig")
+#It contains the RepliScore for different genomic position as ranges
+
+###Get average of RepliScore between all cellLines
+###Create data frame with all values
+
+
+Repli_allScores<-data.frame(S1=RepliSeq_SKNSH$score,S2=RepliSeq_MCF$score,S3=RepliSeq_BJ$score,S4=RepliSeq_NHEK$score,S5=RepliSeq_HEPG$score,S6=RepliSeq_IMR$score,S7=RepliSeq_K$score,S8=RepliSeq_HELA$score,S9=RepliSeq_GM$score,S10=RepliSeq_HUVEC$score, S11=RepliSeq_BG$score)
+
+Repli_allScores$score_average<-matrixStats::rowMedians(as.matrix(Repli_allScores))
+##Change negative values to 0
+Repli_allScores$score_average<-ifelse(Repli_allScores$score_average<0, 0, Repli_allScores$score_average) #Drop values with negatives
+RepliSeq_combined<-RepliSeq_SKNSH #Just to duplicate GRanges
+RepliSeq_combined$score_average<-Repli_allScores$score_average
+#Check distribution of repliScores
+quantile(RepliSeq_combined$score_average, probs = seq(0,1,0.1))
+
+
+####
+# Get signal as "RleList"; the signal is stored in the "score" metadata column
+RepliSeq_combined<-sort(GenomeInfoDb::sortSeqlevels(RepliSeq_combined))
+score <- GenomicRanges::coverage(RepliSeq_combined, weight="score_average")
+# Compute average signal per tile
+RepliSeq_combined_Mb <- GenomicRanges::binnedAverage(bins, score, "average_score_Mb")
+##Add extra column to say to which decile it belongs
+RepliSeq_combined_Mb2<-as.data.frame(RepliSeq_combined_Mb)
+RepliSeq_combined_Mb2<-RepliSeq_combined_Mb2 %>% mutate(Decile = ntile(average_score_Mb, 10)) #Use dplyr
+RepliSeq_combined_Mb$Decile<-RepliSeq_combined_Mb2$Decile##Add also to the Granges object
+##To know the ranges
+decil_labels<-quantile(RepliSeq_combined_Mb$average_score_Mb, probs = seq(0,1,0.1))
+decil_labels
+
+
+#RepliSeq_combined_Mb #Same but with the Mb bins
+
+##Import data, this is the file with all the mutations from ICGC
+###We cannot provide you directly with the file due to ICGC data restrictions...
+##You can generate it by running the Figure1.Rmd
+icgc2_allmuts<-as.data.frame(read.delim("Data/Figure2/Raw_Calculations/icgc2_allmuts.txt")) ##Obtained from the running calculations_fig1a in the Figure1.Rmd
+
+require(GenomicRanges)
+require(ggbio)
+require(BSgenome.Hsapiens.UCSC.hg19)
+
+chr.lengths = seqlengths(Hsapiens)[1:23]
+names(chr.lengths)<-c(paste0("chr",seq(1,22,1)),"chrX")
+chr.lengths
+###
+
+
+#######
+###
+library(rtracklayer)
+library(hwglabr2)
+
+
+
+##To know the ranges
+decil_labels<-quantile(RepliSeq_combined_Mb$average_score_Mb, probs = seq(0,1,0.1))
+decil_labels
+
+####Add data to mafcancer 
+dim(icgc2_allmuts)
+tmp<-data.frame(Gene=icgc2_allmuts$Hugo_Symbol[],start=icgc2_allmuts$Start_Position[], stop=icgc2_allmuts$End_Position[], chrom=icgc2_allmuts$Chromosome[])
+#Create data frame with mutations
+tmp$chrom<-paste0("chr",tmp$chrom)#Add chr
+dim(tmp)
+tmp = makeGRangesFromDataFrame(df = tmp, start.field = "start", end.field = "stop", seqnames.field = "chrom",keep.extra.columns = T) # to Granges
+#findOverlaps
+olaps = findOverlaps(tmp, RepliSeq_combined_Mb,select = "arbitrary")  #This function gives the matrix positions for each mutation (positions at RepliSeq_combined_Mb)
+#olaps<-as.data.frame(olaps)
+##Add data to tmp
+tmp<-as.data.frame(tmp)
+tmp$average_score_Mb<-RepliSeq_combined_Mb2$average_score_Mb[olaps]
+tmp$Decile<-RepliSeq_combined_Mb2$Decile[olaps]
+tmp$Start_Mb<-RepliSeq_combined_Mb2$start[olaps]
+tmp$End_Mb<-RepliSeq_combined_Mb2$end[olaps]
+###Add to the maf file
+icgc2_allmuts$Average_RepliScore_Mb<-tmp$average_score_Mb
+icgc2_allmuts$RepliScore_Decile<-tmp$Decile
+icgc2_allmuts$Start_Mb<-tmp$Start_Mb
+icgc2_allmuts$End_Mb<-tmp$End_Mb
+table(icgc2_allmuts$RepliScore_Decile)
+
+
+repli_melt_icgc<-subset(icgc2_allmuts[,c("Tumor_type","SBS.Sig.max","Tumor_Sample_Barcode","RepliScore_Decile","Start_Mb","End_Mb","Chromosome")], icgc2_allmuts$SBS.Sig.max %in% c("AICDA_canonical","SBS2","SBS13"))
+dim(repli_melt_icgc)
+#repli_melt$range<-paste0(repli_melt$Start_Mb,"-",repli_melt$End_Mb,"-",repli_melt$Chromosome)
+repli_melt_icgc$Tumor_Sample_Barcode<-as.character(repli_melt_icgc$Tumor_Sample_Barcode)
+repli_melt_icgc$Mutations<-1 #TO allow addition in next step
+##Collapse summing by tumor_type the RepliScore but separating each signature
+library(dplyr)
+##Melt and sum, this is the mutations per megabase for each signature for each tumor type
+repli_melt_icgc2<-repli_melt_icgc %>% group_by(Tumor_type, SBS.Sig.max,Start_Mb,End_Mb,Chromosome) %>% summarize(Mutations_Mb = sum(Mutations))
+repli_melt_icgc2<-as.data.frame(repli_melt_icgc2)
+head(repli_melt_icgc2)
+dim(repli_melt_icgc2)
+###Assign decil to each mutation
+repli_melt_icgc2$range<-paste0(repli_melt_icgc2$Start_Mb,"-",repli_melt_icgc2$End_Mb,"-",repli_melt_icgc2$Chromosome)
+RepliSeq_combined_Mb2$range<-paste0(RepliSeq_combined_Mb2$start,"-",RepliSeq_combined_Mb2$end,"-",gsub("chr","",RepliSeq_combined_Mb2$seqnames))
+tmp<-match(repli_melt_icgc2$range,RepliSeq_combined_Mb2$range)
+repli_melt_icgc2$RepliScore_Decile<-RepliSeq_combined_Mb2$Decile[tmp]
+
+#repli_melt_icgc2$exonic_effective_length<-RepliSeq_combined_Mb2$exonic_effective_length[tmp] #Add exonic effective length to each range
+repli_melt_icgc2$density_Mutations_Mb<-repli_melt_icgc2$Mutations_Mb
+#repli_melt_icgc2$density_Mutations_Mb<-repli_melt_icgc2$Mutations_Mb/tilewidth#Adjust by percentage of tilewidth(relative to total length)
+###SUm ussing deciles
+repli_melt_icgc2_deciles<-repli_melt_icgc2 %>% group_by(Tumor_type, SBS.Sig.max,RepliScore_Decile) %>% summarize(Mutations_Mb_decile = sum(density_Mutations_Mb))
+dim(repli_melt_icgc2_deciles)
+head(repli_melt_icgc2_deciles)
+repli_melt_icgc2_deciles<-as.data.frame(repli_melt_icgc2_deciles)
+###Adjust data to use the mean per tumor type
+##Get number of samples per tumor type
+Tumor_type_number <-repli_melt_icgc[!duplicated(repli_melt_icgc$Tumor_Sample_Barcode), ]
+Tumor_type_number<-table(Tumor_type_number$Tumor_type)
+repli_melt_icgc2_deciles$Mutations_Mb_decile_mean<-1 #Create the column
+for (i in 1:length(Tumor_type_number)) {
+repli_melt_icgc2_deciles$Mutations_Mb_decile_mean<-ifelse(repli_melt_icgc2_deciles$Tumor_type==names(Tumor_type_number)[i],yes = repli_melt_icgc2_deciles$Mutations_Mb_decile/Tumor_type_number[i],repli_melt_icgc2_deciles$Mutations_Mb_decile_mean)
+}
+
+
+pancancer_repli_p_icgc<-ggboxplot(data = subset(repli_melt_icgc2_deciles,!is.na(RepliScore_Decile)),x ="RepliScore_Decile" , y = "Mutations_Mb_decile_mean",add = "jitter",color = "SBS.Sig.max")+ theme_classic()+geom_smooth(data=subset(repli_melt_icgc2_deciles,!is.na(RepliScore_Decile)),aes(x = RepliScore_Decile, y = Mutations_Mb_decile_mean, color=SBS.Sig.max, fill=SBS.Sig.max), size = 0.5,show.legend = F, se=FALSE)+ labs( x="Late to early replication", y = "Mutation number mean per Mb")+ guides(color=guide_legend(title = "Signature"))
+
+##This is the Supplementary Figure  not included in the article
+
+###Using Medians
+repli_melt_icgc3<-repli_melt_icgc %>% group_by(Tumor_Sample_Barcode,Tumor_type, SBS.Sig.max,Start_Mb,End_Mb,Chromosome) %>% summarize(Mutations_Mb = sum(Mutations))
+repli_melt_icgc3<-as.data.frame(repli_melt_icgc3)
+head(repli_melt_icgc3)
+dim(repli_melt_icgc3)
+###Assign decil to each mutation
+repli_melt_icgc3$range<-paste0(repli_melt_icgc3$Start_Mb,"-",repli_melt_icgc3$End_Mb,"-",repli_melt_icgc3$Chromosome)
+tmp<-match(repli_melt_icgc3$range,RepliSeq_combined_Mb2$range)
+repli_melt_icgc3$RepliScore_Decile<-RepliSeq_combined_Mb2$Decile[tmp]
+#repli_melt_icgc3$exonic_effective_length<-RepliSeq_combined_Mb2$exonic_effective_length[tmp] #Add exonic effective length to each range
+repli_melt_icgc3$density_Mutations_Mb<-repli_melt_icgc3$Mutations_Mb#*(repli_melt_icgc3$exonic_effective_length/tilewidth) #Adjust by percentage of e
+
+
+###SUm ussing deciles
+repli_melt_icgc3_deciles<-repli_melt_icgc3 %>% group_by(Tumor_Sample_Barcode,Tumor_type, SBS.Sig.max,RepliScore_Decile) %>% summarize(Mutations_Mb_decile = sum(density_Mutations_Mb))
+dim(repli_melt_icgc3_deciles)
+head(repli_melt_icgc3_deciles)
+repli_melt_icgc3_deciles<-as.data.frame(repli_melt_icgc3_deciles)
+repli_melt_icgc3_deciles<-subset(repli_melt_icgc3_deciles,!is.na(RepliScore_Decile))
+###Graph using median and confidence intervals 95%
+##The approximate 95% confidence intervals of the median (across tumour samples: Fig. 2d and Extended Data Fig. 1e,f)for the 1 Mbwindows were estimated using theformula +-1.58*IQR/ sqrt(n_samp), as defined in the R function boxplot.stats and references therein
+###Create data frame with medians to be able to lauch the regression
+repli_melt4_icgc<-repli_melt_icgc3_deciles %>% group_by(Tumor_type, SBS.Sig.max,RepliScore_Decile) %>% summarize(Mutations_Mb_median = median(Mutations_Mb_decile))
+repli_melt4_icgc<-as.data.frame(repli_melt4_icgc)
+head(repli_melt4_icgc)
+dim(repli_melt4_icgc)
+
+pancancer_perTumor_repli_p_icgc<-ggplot(repli_melt_icgc3_deciles[,],aes(x = RepliScore_Decile, y = Mutations_Mb_decile, colour = SBS.Sig.max,fill=SBS.Sig.max))+ theme_classic()+facet_wrap(facets = vars(Tumor_type),nrow = 7,ncol = 5)+ guides(color=guide_legend(title = "Signature"))+stat_summary(fun= median,geom = "errorbar",position = position_dodge(0.95),width = .2,fun.max = function(x) median(x) + (IQR(x)*1.58 / sqrt(length(x))), fun.min = function(x) median(x) - (IQR(x)*1.58 / sqrt(length(x))))+stat_summary(fun.y = "median", geom = "point",position = position_dodge(0.95),size = 1, colour="black",show.legend = F)+geom_smooth(repli_melt4_icgc[,],mapping = aes(x = RepliScore_Decile, y = Mutations_Mb_median, colour = SBS.Sig.max,fill=SBS.Sig.max), size = 0.5,show.legend = F, se=F)+scale_x_continuous(breaks=seq(1,10,by = 1))+ labs( x="Late to early replication", y = "Sample's median mutation number per Mb")
+
+
+#######
+####
+#Now for better visualization normalize the mutation density using the total number of mutation for each sample within signatures and then do a boxplot (by tumor)
+repli_melt_icgc5<-repli_melt_icgc %>% group_by(Tumor_Sample_Barcode,Tumor_type, SBS.Sig.max) %>% summarize(Mutations_Mb = sum(Mutations))
+repli_melt_icgc5<-as.data.frame(repli_melt_icgc5)
+head(repli_melt_icgc5)
+dim(repli_melt_icgc5)
+#Get the total of mutations first
+##Now get the number of mutation per decil per sample, saved in repli_melt_icgc3_deciles
+
+repli_melt_icgc3_deciles$Mutations_Mb_decile_normalized<-repli_melt_icgc3_deciles$Mutations_Mb_decile/repli_melt_icgc5$Mutations_Mb[match(paste0(repli_melt_icgc3_deciles$Tumor_Sample_Barcode,repli_melt_icgc3_deciles$SBS.Sig.max),paste0(repli_melt_icgc5$Tumor_Sample_Barcode,repli_melt_icgc5$SBS.Sig.max))]
+  
+pancancer_repli_p_icgc_normalized<-ggboxplot(data = subset(repli_melt_icgc3_deciles,!is.na(RepliScore_Decile)),x ="RepliScore_Decile" , y = "Mutations_Mb_decile_normalized",add = "jitter",color = "SBS.Sig.max",fill = "white",size = 0.5)+ theme_classic()+facet_wrap(facets = vars(Tumor_type),nrow = 7,ncol = 5)+geom_smooth(data=subset(repli_melt_icgc3_deciles,!is.na(RepliScore_Decile)),aes(x = RepliScore_Decile, y = Mutations_Mb_decile_normalized, color=SBS.Sig.max, fill=SBS.Sig.max), size = 0.5,show.legend = F, se=FALSE)+ labs( x="Late to early replication", y = "Normalized mutation density")+ guides(color=guide_legend(title = "Signature"))+scale_y_continuous(limits = c(0,0.5))
+  
+  
+ ####Now try to generate biomodal distributions and evaluate skewness 
+###Sum mutations per sample per tumor type agroupating by late (Decile 1-5) or early (Decile 6-10), then multiply all "Lates" by -1 (also this is per signature)
+head(repli_melt_icgc3_deciles) #Use this data
+repli_melt_icgc3_deciles$Replication_Zone<-ifelse(repli_melt_icgc3_deciles$RepliScore_Decile<=5,"Late","Early")
+repli_melt_icgc3_deciles2<-repli_melt_icgc3_deciles %>% group_by(Tumor_Sample_Barcode,Tumor_type, SBS.Sig.max,Replication_Zone) %>% summarize(Mutations_Mb_decile_zone = sum(Mutations_Mb_decile)) #Sum
+repli_melt_icgc3_deciles2<-as.data.frame(repli_melt_icgc3_deciles2)
+#Multiple by -1 the Late zones
+repli_melt_icgc3_deciles2$Mutations_Mb_decile_zone_histo<-ifelse(repli_melt_icgc3_deciles2$Replication_Zone=="Late",repli_melt_icgc3_deciles2$Mutations_Mb_decile_zone*-1,repli_melt_icgc3_deciles2$Mutations_Mb_decile_zone)
+
+
+  
+```
+
+**Creating the 25 kb windows**: 
+
+Some preliminary calculations for the mutations sum within the 25 kb bins. Main figure generated in python, check [MutationAggregate.py](https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/MutationAggregate.py).
+
+```{r,echo=T,eval=F}
+########
+#####
+######
+####
+##Need to run first panel2ab_cals chunk to obtain the RepliSeq_combined_Mb object
+##Get Granges object by tumor type and having the number of each signature mutations by each range using 25 kb windows
+
+tilewidth<-25000
+bins <- GenomicRanges::tileGenome(GenomeInfoDb::seqlengths(RepliSeq_combined_Mb),tilewidth=tilewidth, cut.last.tile.in.chrom=TRUE)
+score <- GenomicRanges::coverage(RepliSeq_combined, weight="score_average")
+# Compute average signal per tile
+RepliSeq_combined_25k <- GenomicRanges::binnedAverage(bins, score, "average_score_Mb")
+##Add extra column to say to which decile it belongs
+RepliSeq_combined_25k2<-as.data.frame(RepliSeq_combined_25k)
+RepliSeq_combined_25k2<-RepliSeq_combined_25k2 %>% mutate(Decile = ntile(average_score_Mb, 10)) #Use dplyr
+RepliSeq_combined_25k2$Decile<-RepliSeq_combined_25k2$Decile##Add also to the Granges object
+##To know the ranges
+decil_labels<-quantile(RepliSeq_combined_25k$average_score_Mb, probs = seq(0,1,0.1))
+decil_labels
+
+dim(icgc2_allmuts)
+tmp<-data.frame(Gene=icgc2_allmuts$Hugo_Symbol[],start=icgc2_allmuts$Start_Position[], stop=icgc2_allmuts$End_Position[], chrom=icgc2_allmuts$Chromosome[])
+#Create data frame with mutations
+tmp$chrom<-paste0("chr",tmp$chrom)#Add chr
+dim(tmp)
+tmp = makeGRangesFromDataFrame(df = tmp, start.field = "start", end.field = "stop", seqnames.field = "chrom",keep.extra.columns = T) # to Granges
+#findOverlaps
+olaps = findOverlaps(tmp, RepliSeq_combined_25k,select = "arbitrary")  #This function gives the matrix positions for each mutation (positions at RepliSeq_combined_Mb)
+#olaps<-as.data.frame(olaps)
+##Add data to tmp
+tmp<-as.data.frame(tmp)
+tmp$average_score_Mb<-RepliSeq_combined_25k2$average_score_Mb[olaps]
+tmp$Decile<-RepliSeq_combined_25k2$Decile[olaps]
+tmp$Start_Mb<-RepliSeq_combined_25k2$start[olaps]
+tmp$End_Mb<-RepliSeq_combined_25k2$end[olaps]
+###Add to the maf file
+icgc2_allmuts$Average_RepliScore_Mb<-tmp$average_score_Mb
+icgc2_allmuts$RepliScore_Decile<-tmp$Decile
+icgc2_allmuts$Start_Mb<-tmp$Start_Mb
+icgc2_allmuts$End_Mb<-tmp$End_Mb
+table(icgc2_allmuts$RepliScore_Decile)
+
+
+repli_melt_icgc<-subset(icgc2_allmuts[,c("Tumor_type","SBS.Sig.max","Tumor_Sample_Barcode","RepliScore_Decile","Start_Mb","End_Mb","Chromosome")], icgc2_allmuts$SBS.Sig.max %in% c("AICDA_canonical","SBS2","SBS13"))
+dim(repli_melt_icgc)
+repli_melt_icgc$Tumor_Sample_Barcode<-as.character(repli_melt_icgc$Tumor_Sample_Barcode)
+repli_melt_icgc$Mutations<-1 #TO allow addition in next step
+##Collapse summing by tumor_type the RepliScore but separating each signature
+library(dplyr)
+
+repli_melt2_25k<-list()
+for (i in 1:3) {
+##Repeat for each signature
+repli_melt2_25k[[i]]<-subset(repli_melt_icgc,repli_melt_icgc$SBS.Sig.max%in% unique(repli_melt_icgc$SBS.Sig.max)[i]) %>% group_by(Tumor_type, SBS.Sig.max,Start_Mb,End_Mb,Chromosome) %>% summarize(Mutations_Mb = sum(Mutations))
+repli_melt2_25k[[i]]<-as.data.frame(repli_melt2_25k[[i]])
+colnames(repli_melt2_25k[[i]])<-c(colnames(repli_melt2_25k[[i]])[1:5],paste0("Mutations_Mb_",unique(repli_melt_icgc$SBS.Sig.max)[i]))
+repli_melt2_25k[[i]]$range<-paste0(repli_melt2_25k[[i]]$Start_Mb,"-",repli_melt2_25k[[i]]$End_Mb,"-",repli_melt2_25k[[i]]$Chromosome)
+}
+
+head(repli_melt2_25k[[1]])
+colnames(repli_melt2_25k[[1]])
+repli_melt_total<-icgc2_allmuts[,c("Tumor_type","SBS.Sig.max","Tumor_Sample_Barcode","RepliScore_Decile","Start_Mb","End_Mb","Chromosome")]
+dim(repli_melt_total)
+repli_melt_total<-icgc2_allmuts[,c("Tumor_type","SBS.Sig.max","Tumor_Sample_Barcode","RepliScore_Decile","Start_Mb","End_Mb","Chromosome")]
+dim(repli_melt_total)
+repli_melt_total$Tumor_Sample_Barcode<-as.character(repli_melt_total$Tumor_Sample_Barcode)
+repli_melt_total$Mutations<-1 #TO allow addition in next step
+repli_melt_total<-repli_melt_total %>% group_by(Tumor_type,Start_Mb,End_Mb,Chromosome) %>% summarize(Mutations_Mb_all = sum(Mutations))
+dim(repli_melt_total)
+head(repli_melt_total)
+repli_melt_total<-as.data.frame(repli_melt_total)
+repli_melt_total$range<-paste0(repli_melt_total$Start_Mb,"-",repli_melt_total$End_Mb,"-",repli_melt_total$Chromosome)
+
+repli_melt2_25k_merge<-merge(repli_melt2_25k[[1]],repli_melt2_25k[[2]],by=c("Tumor_type","Start_Mb","End_Mb","Chromosome","range"),all=T)
+dim(repli_melt2_25k_merge)
+head(repli_melt2_25k_merge)
+head(repli_melt2_25k_merge[,-c(6,8)])
+repli_melt2_25k_merge<-repli_melt2_25k_merge[,-c(6,8)]
+repli_melt2_25k_merge<-merge(repli_melt2_25k_merge,repli_melt2_25k[[3]],by=c("Tumor_type","Start_Mb","End_Mb","Chromosome","range"),all=T)
+nrow(repli_melt2_25k[[1]]);nrow(repli_melt2_25k[[2]]);nrow(repli_melt2_25k[[3]])
+head(repli_melt2_25k_merge)
+repli_melt2_25k_merge<-repli_melt2_25k_merge[,-8]
+tail(repli_melt2_25k_merge)
+
+unique(repli_melt2_25k_merge$Tumor_type)
+
+repli_melt2_25k_merge<-merge(repli_melt2_25k_merge,repli_melt_total,by=c("Tumor_type","Start_Mb","End_Mb","Chromosome","range"),all=T)
+head(repli_melt2_25k_merge)
+dim(repli_melt2_25k_merge)
+repli_melt2_25k_merge[is.na(repli_melt2_25k_merge)] <- 0
+
+RepliSeq_combined_25k2$range<-paste0(RepliSeq_combined_25k2$start,"-",RepliSeq_combined_25k2$end,"-",gsub("chr","",RepliSeq_combined_25k2$seqnames))
+tmp<-match(repli_melt2_25k_merge$range,RepliSeq_combined_25k2$range)
+repli_melt2_25k_merge$RepliScore_Decile<-RepliSeq_combined_25k2$Decile[tmp]
+#repli_melt2_25k_merge$exonic_effective_length<-RepliSeq_combined_25k2$exonic_effective_length[tmp] #Add exonic effective length to each range, for WES data
+repli_melt2_25k_merge$Mutations_Mb_AICDA_canonical_density<-repli_melt2_25k_merge$Mutations_Mb_AICDA_canonical/tilewidth#*(repli_melt2_25k_merge$exonic_effective_length)
+repli_melt2_25k_merge$Mutations_Mb_SBS13_density<-repli_melt2_25k_merge$Mutations_Mb_SBS13/tilewidth#*(repli_melt2_25k_merge$exonic_effective_length)
+repli_melt2_25k_merge$Mutations_Mb_SBS2_density<-repli_melt2_25k_merge$Mutations_Mb_SBS2/tilewidth#*(repli_melt2_25k_merge$exonic_effective_length)
+repli_melt2_25k_merge$Mutations_Mb_all_density<-repli_melt2_25k_merge$Mutations_Mb_all/tilewidth#*(repli_melt2_25k_merge$exonic_effective_length)
+Tumor_type_number <-repli_melt_icgc[!duplicated(repli_melt_icgc$Tumor_Sample_Barcode), ]
+Tumor_type_number<-table(Tumor_type_number$Tumor_type)
+for (i in 1:length(Tumor_type_number)) {
+repli_melt2_25k_merge[,c("Mutations_Mb_AICDA_canonical_density","Mutations_Mb_SBS13_density","Mutations_Mb_SBS2_density","Mutations_Mb_all_density")]<-ifelse(repli_melt2_25k_merge$Tumor_type==names(Tumor_type_number)[i],yes = repli_melt2_25k_merge[,c("Mutations_Mb_AICDA_canonical_density","Mutations_Mb_SBS13_density","Mutations_Mb_SBS2_density","Mutations_Mb_all_density")]/Tumor_type_number[i],repli_melt2_25k_merge[,c("Mutations_Mb_AICDA_canonical_density","Mutations_Mb_SBS13_density","Mutations_Mb_SBS2_density","Mutations_Mb_all_density")])
+}
+
+
+repli_melt2_25k_merge_list<-list()
+for (i in 1:length(unique(repli_melt2_25k_merge$Tumor_type))) {
+repli_melt2_25k_merge_tmp<- subset(repli_melt2_25k_merge,Tumor_type%in%unique(repli_melt2_25k_merge$Tumor_type)[i])
+###Add missing ranges so its the same as the RepliSeq_combined_25k2 ranges
+tmp<-setdiff(RepliSeq_combined_25k2$range,repli_melt2_25k_merge_tmp$range)
+tmp<-RepliSeq_combined_25k2[RepliSeq_combined_25k2$range%in%tmp,c(1:3,6,8)]
+tmp<-data.frame(Tumor_type=rep(repli_melt2_25k_merge_tmp$Tumor_type[1],nrow(tmp)),Start_Mb=tmp$start,End_Mb=tmp$end,Chromosome=gsub("chr","",tmp$seqnames),range=tmp$range)
+repli_melt2_25k_merge_tmp<- bind_rows(repli_melt2_25k_merge_tmp,tmp)
+repli_melt2_25k_merge_tmp[is.na(repli_melt2_25k_merge_tmp)] <- 0 #Replace NA with 0
+##get with ranges to add
+repli_melt2_25k_merge_list[[i]] = makeGRangesFromDataFrame(df = repli_melt2_25k_merge_tmp, start.field = "Start_Mb", end.field = "End_Mb", seqnames.field = "Chromosome",keep.extra.columns = T)
+##Sort
+repli_melt2_25k_merge_list[[i]]<-sort(GenomeInfoDb::sortSeqlevels( repli_melt2_25k_merge_list[[i]]))
+}
+repli_melt2_25k_merge_list[[1]]
+########save
+save(repli_melt2_25k_merge_list,file = "/media/user/seagate_ICM/AICDA_analysis/ICGC/Repliseq/ICGC_tumorMutations_25k.RData")
+
+
+####Generate a global with adding all tumors
+for (i in 1:length(unique(repli_melt2_25k_merge$Tumor_type))) {
+   if (i==1) {
+  repli_melt2_25k_all<-as.data.frame(repli_melt2_25k_merge_list[[i]])[1:121465,]
+}
+  
+  if (i!=1) {
+    repli_melt2_25k_all[1:121465,8:16]<-repli_melt2_25k_all[1:121465,8:16]+as.data.frame(repli_melt2_25k_merge_list[[i]])[1:121465,8:16]
+}
+  
+}
+
+repli_melt2_25k_all$Tumor_type<-"All_tumors"
+repli_melt2_25k_all = makeGRangesFromDataFrame(df = repli_melt2_25k_all, start.field = "start", end.field = "end", seqnames.field = "seqnames",keep.extra.columns = T)
+
+save(repli_melt2_25k_all,file = "/media/user/seagate_ICM/AICDA_analysis/ICGC/Repliseq/ICGC_tumorMutations_25k_ALLTUMORS.RData")
+
+```
+
+***
+
+\pagebreak
+
+
+
+# Fig 2c
+
+```{r,echo=T,eval=F}
+##Calculations
+
+
+
+##Import expression data
+icgc_exp <- read.delim("Data/Figure2/Raw_Calculations/tophat_star_fpkm_uq.v2_aliquot_gl.tsv.gz", header=FALSE) ##Consult the manuscript to download this file from the original study, obtained from: https://dcc.icgc.org/api/v1/download?fn=/PCAWG/transcriptome/gene_expression/tophat_star_fpkm_uq.v2_aliquot_gl.tsv.gz 
+#1522 samples only...
+colnames(icgc_exp)<-icgc_exp[1,]
+icgc_exp<-icgc_exp[-1,]
+colnames(icgc_exp)[1]<-"Gene"
+##Transform ensbl id to Hugo_symbol
+###Collect gene names
+library(biomaRt)
+mart=useMart(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+mart_hg<-biomaRt::getBM(attributes = c("ensembl_gene_id","ensembl_gene_id_version","external_gene_name"),mart = mart)
+##Add gene_symbol column
+icgc_exp$Gene_symbol<-mart_hg$external_gene_name[match(icgc_exp$Gene,mart_hg$ensembl_gene_id_version)]
+length(unique(icgc_exp$Gene_symbol))
+[1] 25288
+#Eliminate missing
+icgc_exp<-icgc_exp[!is.na(icgc_exp$Gene_symbol),]
+
+###COllapse repeated genes (because of different id.version)
+#There are 25288 unique genes, keep mean values from each gene for each patient
+#icgc_exp2 <- aggregate(. ~ Gene_symbol, data = icgc_exp, median)
+icgc_exp<-icgc_exp[!duplicated(icgc_exp$Gene_symbol),]
+rownames(icgc_exp)<-icgc_exp$Gene_symbol
+icgc_exp<-icgc_exp[,-c(1,ncol(icgc_exp))] #Eliminate Gene and Gene_symbol columns
+
+##(sample can either be the aliquot_id or library)
+####Write Tumor sample barcode instead of aliquot_id to match the other sets...
+pcawg_sample_sheet <- read.delim("Data/Figure1/Raw_calculations/pcawg_sample_sheet.tsv")
+length(intersect(pcawg_sample_sheet$aliquot_id,colnames(icgc_exp))) #1466/1521 in common
+pcawg_specimen_histology_August2016_v9$aliquot_id<-pcawg_sample_sheet$aliquot_id[match(pcawg_specimen_histology_August2016_v9$donor_unique_id,pcawg_sample_sheet$donor_unique_id)]
+pcawg_sample_sheet$Tumor_Sample_Barcode<-pcawg_specimen_histology_August2016_v9$Tumor_Sample_Barcode[match(pcawg_sample_sheet$donor_unique_id,pcawg_specimen_histology_August2016_v9$donor_unique_id)]
+
+icgc_exp<-icgc_exp[,colnames(icgc_exp)%in%pcawg_sample_sheet$aliquot_id] #SUbset
+#Change colnames to Tumor_Sample_Barcode
+colnames(icgc_exp)<-pcawg_sample_sheet$Tumor_Sample_Barcode[match(colnames(icgc_exp),pcawg_sample_sheet$aliquot_id)]
+
+#Take out duplicates
+icgc_exp<-icgc_exp[,!duplicated(colnames(icgc_exp))]
+
+##Subset clinical to same samples
+ICGC_clinical_expr<-subset(ICGC_clinial_n3110[!duplicated(ICGC_clinial_n3110$Tumor_Sample_Barcode2),],ICGC_clinial_n3110$Tumor_Sample_Barcode2 %in%colnames(icgc_exp))
+ICGC_clinical_expr<-ICGC_clinical_expr[ICGC_clinical_expr$Tumor_Sample_Barcode2%in%ICGC_clinial_palim_annot$Sample,] #Samples included in the muts
+###Now subset expression to those samples too
+icgc_exp<-icgc_exp[,colnames(icgc_exp)%in%ICGC_clinical_expr$Tumor_Sample_Barcode2]
+ICGC_clinical_expr<-ICGC_clinical_expr[ICGC_clinical_expr$Tumor_Sample_Barcode2%in%colnames(icgc_exp),]
+
+nrow(ICGC_clinical_expr)==ncol(icgc_exp) #Check dimensions are equal, 1130 samples
+
+##How many tumor types
+length(table(ICGC_clinical_expr$histology_abbreviation))
+#24
+##SUbset mutations to same samples as expression data
+
+length(unique(icgc2_allmuts_clonality$Sample))
+[1] 2707
+###
+length(unique(icgc2_allmuts_clonality$Sample[icgc2_allmuts_clonality_loops$Sample%in%ICGC_clinical_expr$Tumor_Sample_Barcode2]))
+[1] 1130
+
+icgc2_allmuts_clonality_exp<-icgc2_allmuts_clonality[icgc2_allmuts_clonality$Sample%in%ICGC_clinical_expr$Tumor_Sample_Barcode2,]
+
+########
+#########
+####Perform correlations...
+##Transpose expression data
+icgc_exp<-t(icgc_exp)
+
+###Get the number of AICDA mutations per sample, per gene, per tumor...
+rna_melt<-icgc2_allmuts_clonality_exp[icgc2_allmuts_clonality_exp$AICDA_mutation=="YES",] %>% group_by(Sample,Hugo_Symbol,Tumor_type) %>% dplyr::summarise(Mutations_Mb = sum(Mutations))
+rna_melt<-as.data.frame(rna_melt)
+head(rna_melt)
+dim(rna_melt)
+
+length(unique(rna_melt$Hugo_Symbol))
+[1] 21341 ##Mutated genes due AICDA
+
+21341/34596
+[1] 0.6168632 #Fraction genes touched by AICDA
+
+###SUbset expression of genes to the ones also appearing in at least one sample
+icgc_exp2<-icgc_exp[,colnames(icgc_exp)%in%unique(rna_melt$Hugo_Symbol)] ##only 1403 genes!!
+
+
+1403/21341###Fraction of mutated genes being expressed
+
+1403/25287##Fraction of expressed genes being mutated
+
+##Add tumor type to exp
+icgc_exp2<-as.data.frame(icgc_exp2)
+
+icgc_exp2$Tumor_type<-rna_melt$Tumor_type[match(rownames(icgc_exp2),rna_melt$Sample)]
+
+
+###Put expression and mutations in the same sample order
+
+###%
+tumors_list<-table(ICGC_clinical_expr$histology_abbreviation)
+##Table to replace results
+correlations_table<-as.data.frame(matrix(data=NA,nrow=ncol(icgc_exp2),ncol = 48,dimnames = list(colnames(icgc_exp2),c(paste0("p_val_",names(tumors_list)),paste0("Rho_",names(tumors_list))))))
+correlations_table<-correlations_table[-nrow(correlations_table),]
+for (i in 1:length(tumors_list)) {
+  ##subset data to tumor type [i]
+  icgc_exp2_tmp<-icgc_exp2[icgc_exp2$Tumor_type%in%names(tumors_list)[i],]
+  rna_melt_tmp<-rna_melt[rna_melt$Tumor_type%in%names(tumors_list)[i],]
+  ICGC_clinical_expr_tmp<-ICGC_clinical_expr[ICGC_clinical_expr$histology_abbreviation%in%names(tumors_list)[i],]
+  
+  ##Other cycle to do by gene
+  for (j in 1:(ncol(icgc_exp2)-1)) {
+    ICGC_clinical_expr_tmp$exp_tmp<-icgc_exp2_tmp[match(ICGC_clinical_expr_tmp$Tumor_Sample_Barcode2,rownames(icgc_exp2_tmp)),j] #Add expression Gene j
+    rna_melt_tmp2<-rna_melt_tmp[rna_melt_tmp$Hugo_Symbol%in%colnames(icgc_exp2)[j],]
+    
+    ICGC_clinical_expr_tmp$mut_tmp<-rna_melt_tmp2$Mutations_Mb[match(ICGC_clinical_expr_tmp$Tumor_Sample_Barcode2,rna_melt_tmp2$Sample)] #Add muts
+    ICGC_clinical_expr_tmp$mut_tmp[is.na(ICGC_clinical_expr_tmp$mut_tmp)]<-0##Replace with 0 in case there were not mutations detected
+    test_tmp<- cor.test(x=as.numeric(ICGC_clinical_expr_tmp$exp_tmp), y =as.numeric(ICGC_clinical_expr_tmp$mut_tmp),method = "spearman" ,na.action="na.omit")
+
+  correlations_table[j,i]<-test_tmp$p.value
+
+    correlations_table[j,i+24]<-test_tmp$estimate
+
+    
+  }
+ 
+}
+
+####Modify data for  plotting
+correlations_table<-correlations_table[rowSums(is.na(correlations_table)) != ncol(correlations_table), ] #remove empty rows
+
+correlations_table_pval<-correlations_table[,1:24]
+correlations_table_rho<-correlations_table[,25:48]
+colnames(correlations_table_pval)<-names(tumors_list)
+colnames(correlations_table_rho)<-names(tumors_list)
+
+correlations_table_pval<-as.data.frame(t(correlations_table_pval))
+correlations_table_pval$Tumor_type<-rownames(correlations_table_pval)
+
+t<-melt(correlations_table_pval[],id.vars=c('Tumor_type'), measure.vars=c(rownames(correlations_table)))
+colnames(t)<-c("Tumor_type","Gene","p_val")##Change colnames
+
+correlations_table_rho<-as.data.frame(t(correlations_table_rho))
+correlations_table_rho$Tumor_type<-rownames(correlations_table_rho)
+
+t2<-melt(correlations_table_rho[],id.vars=c('Tumor_type'), measure.vars=c(rownames(correlations_table)))
+colnames(t2)<-c("Tumor_type","Gene","Rho")
+
+correlations_table2<-merge(t,t2, by = c("Tumor_type","Gene"))
+
+###Take out missing values on p_val
+correlations_table2<-correlations_table2[!is.na(correlations_table2$p_val),]
+
+genes_associated<-correlations_table2$Gene[correlations_table2$p_val<0.05&correlations_table2$Rho>0]###Number of genes with significant correlation and positive
+
+length(unique(genes_associated)) #only 81 genes
+genes_associated[duplicated(genes_associated)] # 3 genes in more than one tumor type
+
+##This is a supplementary Table
+write.table(unique(genes_associated),file = "/media/user/seagate_ICM/AICDA_analysis/ICGC/Expression_muts_correlation/genes_AICDA_trans_associated.tab",row.names = F,quote = F,sep = "\t",col.names = F)
+#################
+##############
+
+correlations_table2$DE<-ifelse(correlations_table2$p_val<0.05&correlations_table2$Rho>0,"Associated","Not associated")
+correlations_table2$label<-paste0(correlations_table2$Gene,"-",correlations_table2$Tumor_type)
+rownames(correlations_table2)<-seq(1:nrow(correlations_table2))
+#Value that are 0 in pval change to a very small value
+correlations_table2$p_val[correlations_table2$p_val==0]<-0.00000001
+
+
+###ORA analysis using DAVID online...of genes
+#Import results
+DAVID_ORA_analysis <- read.delim("Data/Figure2/Raw_Calculations/DAVID_ORA_analysis.txt")
+immu_ora<-gsub((strsplit(DAVID_ORA_analysis$Genes[1], '\\s+')[[1]]),pattern = ',',replacement = "")
+sensory_ora<-gsub((strsplit(DAVID_ORA_analysis$Genes[30], '\\s+')[[1]]),pattern = ',',replacement = "")
+correlations_table2$ORA<-ifelse(correlations_table2$Gene%in%immu_ora&correlations_table2$p_val<0.05&correlations_table2$Rho>0,"IGv region",ifelse(correlations_table2$Gene%in%sensory_ora&correlations_table2$p_val<0.05&correlations_table2$Rho>0,"Sensory transduction",ifelse(correlations_table2$p_val<0.05,"Significant","Not significant")))
+
+
+```
+
+
+```{r panel_2c, fig.width=19,fig.height=11}
+#
+#Import data
+
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+
+correlations_table2<-as.data.frame(read.delim("Data/Figure2/Figure2c.tab"))
+DAVID_ORA_analysis <- read.delim("Data/Figure2/Raw_Calculations/DAVID_ORA_analysis.txt")
+###Volcano plot
+library(ggrepel)
+
+p_enrich_transcription<-ggplot(data=correlations_table2, aes(y=-log10(p_val), x=Rho, col=ORA,shape=DE)) +geom_point() +theme_std(base_size=14) + scale_color_manual(name="GSEA enrichment",values = c("red","grey","blue","black"),labels=c(paste0("IGv region (p.val=",scientific(DAVID_ORA_analysis$FDR[1],digits = 2),")" ),"NS",paste0("Sensory transduction (p.val=",scientific(DAVID_ORA_analysis$FDR[30],digits = 2),")" ),"Other"))  +
+    geom_hline(yintercept=-log10(0.05), col="black",linetype="dotted") +
+    geom_vline(xintercept=0, col="black",linetype="dotted")+xlab("Spearman Rho")+theme(legend.position = "right",legend.box = "vertical") +geom_text_repel(data = correlations_table2[correlations_table2$ORA%in%c("IGv region","Sensory transduction"),],aes(label = label,x=Rho, y=-log10(p_val)),  size = 5, box.padding = unit(0.35, "lines"),point.padding = unit(0.3, "lines"),inherit.aes = F)+ylim(c(0,15))+guides(color = guide_legend(order=2),shape = guide_legend(order=1))+ theme(legend.title = element_text(colour="black", size=10,face="bold"),legend.text = element_text(colour="black", size=8))+scale_shape_manual(name="Transcription associated",values = c(17,16),labels=c(paste0("Associated (n=",table(correlations_table2$DE)[1],")" ),paste0("Not associated (n=",table(correlations_table2$DE)[2],")" )))
+
+
+###Pie chart as inset..
+
+pie_dat<-data.frame(Tumor_type=names(table(correlations_table2$Tumor_type[correlations_table2$p_val<0.05&correlations_table2$Rho>0])),values=table(correlations_table2$Tumor_type[correlations_table2$p_val<0.05&correlations_table2$Rho>0]))
+pie_dat$prop<-pie_dat$values.Freq/sum(pie_dat$values.Freq)
+# Add label position
+pie_dat <- pie_dat %>%
+  arrange(desc(Tumor_type)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.4*prop)
+pie_dat
+pie_dat$prop<-round(pie_dat$prop,digits = 2)
+pie_dat$prop_labl<-paste0(pie_dat$prop*100,"%")
+
+  
+color = grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
+cols<-sample(color, nrow(pie_dat))
+             
+p_pie<-ggplot(pie_dat, aes(x = "", y = prop, fill = Tumor_type)) +
+    geom_bar(width = 1, stat = "identity", color = "white") +
+    coord_polar("y", start = 0)+
+    geom_text_repel(aes(y = lab.ypos, label = prop_labl,x = 1.5), color = "black", 
+                    segment.size = .4,nudge_x = .05, 
+                    show.legend = FALSE)+
+    theme_void()+scale_fill_manual(values = cols,name="Tumor type")+theme(legend.title = element_text(size = 9,face="bold"),legend.key.size = unit(0.5, "cm"),legend.text = element_text(size = 9))+ guides(fill = guide_legend(ncol = 2)) 
+
+
+
+###Insert inset
+##Merge inside the other
+##Grab
+# called a "grop" in Grid terminology
+xbp_grob <- ggplotGrob(p_pie)
+
+p_enrich_transcription2<-p_enrich_transcription + annotation_custom(grob = xbp_grob, xmin = 0, xmax = 2.15,  ymin = 11, ymax = 15)+annotate("segment", x=0.7, y=15, xend=1.45, yend=15,col="black", linetype="dashed")+annotate("segment", x=0.7, y=11, xend=1.45, yend=11,col="black", linetype="dashed")+annotate("segment", x=0.7, y=15, xend=.7, yend=11,col="black", linetype="dashed")+annotate("segment", x=1.45, y=15, xend=1.45, yend=11,col="black", linetype="dashed")+annotate("segment", x=1.125, y=9.5, xend=1.425, yend=9.5,col="black", linetype="dashed")+annotate("segment", x=1.125, y=8, xend=1.425, yend=8,col="black", linetype="dashed")+annotate("segment", x=1.125, y=8, xend=1.125, yend=9.5,col="black", linetype="dashed")+annotate("segment", x=1.425, y=8, xend=1.425, yend=9.5,col="black", linetype="dashed")+annotate("segment", x=.7, y=11, xend=1.125, yend=9.5,col="black", linetype="dashed")+annotate("segment", x=1.425, y=9.5, xend=1.45, yend=11,col="black", linetype="dashed")+coord_cartesian(xlim = c(-1, 1), clip="off",ylim=c(0,15))
+
+
+
+p_enrich_transcription2+theme(plot.margin = unit(c(0,2,0,0), "cm"))
+
+
+########
+#####Plot for "pipeline"
+
+
+```
+
+***
+
+\pagebreak

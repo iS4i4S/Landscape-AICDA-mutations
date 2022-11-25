@@ -1,0 +1,2559 @@
+---
+output:
+  rmarkdown::html_document:
+    highlight: pygments
+    toc: true
+    css: style.css
+chunk_output_type: console
+header-includes:
+- \pagenumbering{gobble}
+params:
+    set_title: "Figure-5"
+title: "`r params$set_title`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, autodep = knitr::dep_prev())
+```
+
+***
+
+\pagebreak
+
+# Fig 5a
+
+
+```{r  panel5a_cals,echo=T,eval=F,fig.show="hide"}
+###"/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/data/data_mutations_signature_attribution.txt.gz" signatures
+
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+Composite_maf<-read.maf(maf = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/data/data_mutations.txt.gz")
+length(unique(Composite_maf@data$Tumor_Sample_Barcode))
+#31353
+Composite_maf<-subsetMaf(Composite_maf,tsb = unique(Composite_maf@data$Tumor_Sample_Barcode)) #Eliminate duplicates
+length(table(Composite_maf@data$metamaintype))#41 tumor types
+
+##Calculate AICDA and APOBEC mutations
+
+
+##Add data to clinical
+Composite_clinical <- fread(here('data/data_clinical.txt.gz'))
+Composite_clinical<-subset(Composite_clinical,Composite_clinical$Tumor_Sample_Barcode%in%unique(Composite_maf@data$Tumor_Sample_Barcode))#Subset
+
+
+load("r/AICDA_enrich_function_WES_WGS.RData") ##Change where you downloaded the functions...
+load("r/APOBEC_enrich_function_WES_WGS.RData") ##Change where you downloaded the functions...
+Composite_AICDA<-AICDA_enrichment(Composite_maf, ref_genome = "BSgenome.Hsapiens.UCSC.hg19",prefix = 'chr', add = TRUE, background_n = 60,seq_type = "WGS") #Add the WGS flag to get silent mutations too
+
+####Boxplot of AICDA mutations_fraction of mutations....Add this data to clinical data and also AICDA_enrichment score
+dim(Composite_clinical) #
+Composite_clinical$fraction_AICDA_mutations<-0
+Composite_clinical$fraction_AICDA_mutations<-Composite_AICDA$AICDA_scores$fraction_AICDA_mutations[match(Composite_clinical$Tumor_Sample_Barcode,Composite_AICDA$AICDA_scores$Tumor_Sample_Barcode)]##Add
+
+
+Composite_AICDA$AICDA_scores$AICDA_mutations<-Composite_AICDA$AICDA_scores$n_mutations-Composite_AICDA$AICDA_scores$non_AICDA_mutations
+Composite_clinical$AICDA_mutations<-Composite_AICDA$AICDA_scores$AICDA_mutations[match(Composite_clinical$Tumor_Sample_Barcode,Composite_AICDA$AICDA_scores$Tumor_Sample_Barcode)]
+
+Composite_APO<-APOBEC_enrichment(Composite_maf, ref_genome = "BSgenome.Hsapiens.UCSC.hg19",prefix = 'chr', add = TRUE, seq_type = "WGS") #Add the WGS fla
+
+Composite_clinical$fraction_APOBEC_mutations<-0
+Composite_clinical$fraction_APOBEC_mutations<-Composite_APO$APOBEC_scores$fraction_APOBEC_mutations[match(Composite_clinical$Tumor_Sample_Barcode,Composite_APO$APOBEC_scores$Tumor_Sample_Barcode)]##Add
+
+
+Composite_clinical<-Composite_clinical[!is.na(Composite_clinical$fraction_AICDA_mutations),]##Subset since they have low mutation number...
+#Subset
+###Graph to see distribution of AICDA mutations and APOBEC
+#Melt
+t<-melt(Composite_clinical[],id.vars=c('metamaintype',"msi_high","mmr_signature"), measure.vars=c('fraction_AICDA_mutations','fraction_APOBEC_mutations'))
+
+#Add line global median, add n samples to labels...
+
+Composite_fractionMuts<-
+  ggboxplot(data = t, y ="value", x="metamaintype",color = "variable",xlab = "Tumor type",ylab = "Fraction of SNP mutations",title = "Gorelick et al. study")+theme(axis.text.x = element_text(angle = 90,size=8),axis.title = element_text(face="bold"),plot.title = element_text(hjust = 0.5,face = "bold",size = 15))+ geom_hline(yintercept=mean(Composite_clinical$fraction_AICDA_mutations,na.rm = T), linetype="dashed",color="#F8766D")+ geom_hline(yintercept=mean(Composite_clinical$fraction_APOBEC_mutations,na.rm = T), linetype="dashed",color="#00BFC4")+ guides(color=guide_legend(title = "Mutation type"))+scale_color_discrete(labels=c(paste0("AICDA"," (mean = ", round(mean(Composite_clinical$fraction_AICDA_mutations,na.rm = T),3),")"),paste0("APOBEC"," (mean = ", round(mean(Composite_clinical$fraction_APOBEC_mutations,na.rm = T),3),")")))+scale_x_discrete(labels=paste0(unique(t$metamaintype)," (n=", table(Composite_clinical$metamaintype)[unique(t$metamaintype)],")"))
+
+
+
+##Now subset to MSI tumors and plot ggplot comparing per tumor_type the fractions of AICDA and APOBEC mutations...
+
+##Edit a little the data
+t2<-subset(t,!is.na(t$msi_high))
+t2$msi_high<-ifelse(t2$msi_high=="TRUE","MSI","MSS")
+t2$Compare<-paste0(t2$msi_high,t2$variable)
+# reorder the groups order : I change the order of the factor data$names
+t2$Compare <- factor(t2$Compare , levels=c("MSSfraction_AICDA_mutations", "MSIfraction_AICDA_mutations", "MSSfraction_APOBEC_mutations", "MSIfraction_APOBEC_mutations"))
+##Take out tumor types with less than 4 MSI samples...
+take_out<-table(Composite_clinical$metamaintype[Composite_clinical$msi_high%in%"TRUE"&Composite_clinical$AICDA_mutations>0])[table(Composite_clinical$metamaintype[Composite_clinical$msi_high%in%"TRUE"&Composite_clinical$AICDA_mutations>0])>=4]
+t2<-subset(t2,t2$metamaintype%in%names(take_out))
+
+
+p_tmp<-ggboxplot(data = t2, y ="value", x="metamaintype",color = "Compare",xlab = "Tumor type",ylab = "Fraction of SNP mutations",title = "Gorelick et al. study")+theme(axis.text.x = element_text(angle = 90,size=8),axis.title = element_text(face="bold"),plot.title = element_text(hjust = 0.5,face = "bold",size = 15))+ geom_hline(yintercept=mean(t2$value[t2$Compare%in%"MSIfraction_AICDA_mutations"],na.rm = T), linetype="dashed",color="#F8766D")+ geom_hline(yintercept=mean(t2$value[t2$Compare%in%"MSIfraction_APOBEC_mutations"],na.rm=T), linetype="dashed",color="#00BFC4")+ guides(color=guide_legend(title = "Mutation type"))+scale_color_discrete(labels=c(paste0("AICDA MSS"," (mean = ", round(mean(t2$value[t2$Compare%in%"MSSfraction_AICDA_mutations"],na.rm = T),3),")"), paste0("AICDA MSI"," (mean = ", round(mean(t2$value[t2$Compare%in%"MSIfraction_AICDA_mutations"],na.rm = T),3),")"),paste0("APOBEC MSS"," (mean = ", round(mean(t2$value[t2$Compare%in%"MSSfraction_APOBEC_mutations"],na.rm = T),3),")"),paste0("APOBEC MSI"," (mean = ", round(mean(t2$value[t2$Compare%in%"MSIfraction_APOBEC_mutations"],na.rm = T),3),")"))) +scale_x_discrete(labels=paste0(unique(t2$metamaintype)," (n=",table(Composite_clinical$metamaintype)[unique(t2$metamaintype)],")"))
+
+###Save legend
+lg_msi<-get_legend(p_tmp, position = NULL)
+
+##AICDA
+t2$msi_high <- factor(t2$msi_high , levels=c("MSS","MSI"))
+
+msi_ACIDA_compo<-ggboxplot(data = subset(t2,t2$variable%in%"fraction_AICDA_mutations"), y ="value", x="metamaintype",color = "msi_high",xlab = "Tumor type",ylab = "Fraction of SNP mutations",title = "Gorelick et al. study",palette = c("#F8766D","#7CAE00"))+scale_x_discrete(labels=paste0(unique(t2$metamaintype[t2$variable%in%"fraction_AICDA_mutations"])," (n=",table(t2$metamaintype[t2$variable%in%"fraction_AICDA_mutations"])[unique(t2$metamaintype[t2$variable%in%"fraction_AICDA_mutations"])],")"))+stat_compare_means(method = "wilcox.test", aes(group=msi_high),label.y = 1.01,label = "p.signif",label.x = 1.5,hide.ns=T)+theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),plot.title = element_text(hjust = 0.5,face = "bold",size = 15),axis.title.y = element_text(face="bold"))+ annotate("text", x = 7.5, y = 1.06, label = paste0("global pval ",compare_means(value ~ msi_high, data = t2[t2$variable%in%"fraction_AICDA_mutations",])[6]," (Mann-Whitney U-test)"))
+##Add global p value
+##Add global p value
+    #+ geom_hline(yintercept=mean(t2$value[t2$Compare%in%"MSIfraction_AICDA_mutations"],na.rm = T), linetype="dashed",color="#7CAE00")#+geom_hline(yintercept=mean(t2$value[t2$Compare%in%"MSSfraction_AICDA_mutations"],na.rm = T), linetype="dashed",color="#F8766D")
+
+ compare_means(value ~ msi_high, data = t2[t2$variable%in%"fraction_AICDA_mutations",])
+###APOBEC                                                                                                       
+                                                                                                                                               msi_Apo_compo<-ggboxplot(data = subset(t2,t2$variable%in%"fraction_APOBEC_mutations"), y ="value", x="metamaintype",color = "msi_high",xlab = "Tumor type",ylab = "Fraction of SNP mutations",palette = c("#00BFC4","#C77CFF"))+theme(axis.text.x = element_text(angle = 90,size=8),axis.title = element_text(face="bold"),plot.title = element_text(hjust = 0.5,face = "bold",size = 15))+scale_x_discrete(labels=paste0(unique(t2$metamaintype[t2$variable%in%"fraction_APOBEC_mutations"])," (n=",table(t2$metamaintype[t2$variable%in%"fraction_APOBEC_mutations"])[unique(t2$metamaintype[t2$variable%in%"fraction_APOBEC_mutations"])],")"))+stat_compare_means(method = "wilcox.test", aes(group=msi_high),label = "p.signif",label.y = 1.01,hide.ns=T)+ annotate("text", x = 7.5, y = 1.06, label = paste0("global pval = ",compare_means(value ~ msi_high, data = t2[t2$variable%in%"fraction_APOBEC_mutations",])[6]," (Mann-Whitney U-test)"))
+##Add global p value
++ geom_hline(yintercept=mean(t2$value[t2$Compare%in%"MSIfraction_APOBEC_mutations"],na.rm = T), linetype="dashed",color="#C77CFF")+ geom_hline(yintercept=mean(t2$value[t2$Compare%in%"MSSfraction_APOBEC_mutations"],na.rm = T), linetype="dashed",color="#00BFC4")                                                                                                                                               
+
+compare_means(value ~ msi_high, data = t2[t2$variable%in%"fraction_APOBEC_mutations",])
+##Merge
+                                                                                                                                               
+p_msi_compo<-ggarrange(msi_ACIDA_compo,msi_Apo_compo,nrow = 2,heights = c(1,1.5),legend.grob = lg_msi,legend = "bottom")                                                                                                            
+                                 
+ #####
+##Add data to maf, which mutations are AICDA
+Composite_maf_muts<-(as.data.frame(Composite_maf@data))
+
+Composite_maf_muts<-subset(Composite_maf_muts,(Composite_maf_muts$Tumor_Sample_Barcode %in%Composite_clinical$Tumor_Sample_Barcode))#Subset to same samples as Clinical
+
+
+###
+
+
+
+Composite_maf_muts$Mut_identifier<-paste0(Composite_maf_muts$Tumor_Sample_Barcode,"-",Composite_maf_muts$Start_Position,"-",Composite_maf_muts$mutationid,"-",Composite_maf_muts$t_alt_count) ##To Id AICDA mutations easier
+
+
+Composite_AICDA$maf_AICDA$Mut_identifier<-paste0(Composite_AICDA$maf_AICDA$Tumor_Sample_Barcode,"-",Composite_AICDA$maf_AICDA$Start_Position,"-",Composite_AICDA$maf_AICDA$mutationid,"-",Composite_AICDA$maf_AICDA$t_alt_count)
+
+
+Composite_maf_muts$AICDA_mutation<-ifelse(Composite_maf_muts$Mut_identifier %in% Composite_AICDA$maf_AICDA$Mut_identifier, "YES","NO")###Add a column next to each mutation to indicate if it is AICDA induced or not
+
+###############
+#########"
+######Calculating gene enrichment.....to get the file gene_enrichment_AICDAmuts needed for ploting 4A
+######
+
+d_mutations<-Composite_maf_muts[,c('Tumor_Sample_Barcode','exclude','Hugo_Symbol','Role','putative_resistance_mutation',
+                              'Variant_Classification','Variant_Type','tcn', 'mutationid', 'high_tmb','hotspot_class',
+                              'tm','hotspotid','HGVSp_Short','truncating','Reference_Allele','Tumor_Seq_Allele2',
+                              'Start_Position','End_Position',"AICDA_mutation")]
+
+d_mutations<-as.data.table(d_mutations)#Transform to data.table
+## load gene annotations including covariates
+gene_info <- fread(here('data/gene_info.txt'),
+                   select=c('Hugo_Symbol','Role','panel_introduced','reptime',
+                            'percentage_gene_gc_content','cds_length','hic'))
+
+
+## merge gene annotations to mutation data, drop excluded samples
+d <- d_mutations
+d <- d[d$exclude==F & d$putative_resistance_mutation==F,]
+d <- merge(d, gene_info, by='Hugo_Symbol', all.x=T)
+
+
+## consider the TERT promoter as a unique gene, where the cds_length is now the total length of the promoter region covered by IMPACT
+tert_promoter <- which(d$Hugo_Symbol=='TERT')
+d[tert_promoter, Hugo_Symbol:='TERT promoter']
+d[tert_promoter, cds_length:=499] ## this is the length of the promoter region of TERT covered by IMPACT468
+d[tert_promoter, percentage_gene_gc_content:=0.7896] ## this is the %GC content of TERT promoter region
+
+
+## get observed number of composite mutated samples and mutated samples per gene
+get_composite_rate_per_gene <- function(d) {
+
+    ## get sample barcodes for singletons/composites/overall
+    tbl <- table.freq(d$Tumor_Sample_Barcode)
+    samples <- tbl$value
+    composite_samples <- tbl$value[tbl$N > 1]
+    singleton_samples <- tbl$value[tbl$N == 1]
+
+    ## don't overcount multiple samples per patient
+    samples <- length(unique(strtrim(samples, 9)))
+    composites <- length(unique(strtrim(composite_samples, 9)))
+    singletons <- length(unique(strtrim(singleton_samples, 9)))
+
+    ## calculate the average TCN to include as covariate for this gene
+    tcn <- mean(d$tcn,na.rm=T) 
+    list(
+         singletons=singletons,composites=composites,samples=samples,
+         tcn=tcn,reptime=unique(d$reptime),percentage_gene_gc_content=unique(d$percentage_gene_gc_content),cds_length=unique(d$cds_length),
+         hic=unique(d$hic),
+         panel_introduced=unique(d$panel_introduced))
+}
+get_composite_rate_per_gene2 <- function(d,AICDA=TRUE) {
+
+    ## get sample barcodes for singletons/composites/overall
+    tbl <- table.freq(d$Tumor_Sample_Barcode)
+    samples <- tbl$value[tbl$N > 0]
+    if (AICDA==TRUE) {
+       ###For AICDA condition
+tbl$composite <- tbl$N > 1
+tbl[,N:=NULL]
+d <- merge(d, tbl, by.x='Tumor_Sample_Barcode', by.y='value', all.x=T)
+tbl <- table.freq(d$Tumor_Sample_Barcode)
+singleton_samples <- tbl$value[tbl$N == 1] #Total singletons
+ #For AICDA, Subset to AICDA
+
+composite_samples <- d$Tumor_Sample_Barcode[d$AICDA_mutation=="YES"&d$composite=="TRUE"] #COmposites with AICDA mutation
+    
+    
+    }
+    if (AICDA==FALSE){
+    composite_samples <- tbl$value[tbl$N > 1]
+    singleton_samples <- tbl$value[tbl$N == 1]
+    }
+    
+    ## don't overcount multiple samples per patient
+    samples <- length(unique(strtrim(samples, 9)))
+    composites <- length(unique(strtrim(composite_samples, 9)))
+    singletons <- length(unique(strtrim(singleton_samples, 9)))
+
+    ## calculate the average TCN to include as covariate for this gene
+    tcn <- mean(d$tcn,na.rm=T) 
+    list(
+         singletons=singletons,composites=composites,samples=samples,
+         tcn=tcn,reptime=unique(d$reptime),percentage_gene_gc_content=unique(d$percentage_gene_gc_content),cds_length=unique(d$cds_length),
+         hic=unique(d$hic),
+         panel_introduced=unique(d$panel_introduced))
+} #Redefine function..
+#res <- d[,get_composite_rate_per_gene(.SD),by=Hugo_Symbol]
+
+res <- d[,get_composite_rate_per_gene2(.SD),by=Hugo_Symbol]
+
+## impute missing values
+res[is.nan(tcn),tcn:=2]
+res$hic[is.na(res$hic)] <- round(mean(res$hic,na.rm=T))
+
+
+## prep for test
+res$panel_introduced <- factor(res$panel_introduced)
+res$Hugo_Symbol <- gsub('-','_',res$Hugo_Symbol)
+res$Hugo_Symbol <- gsub(' ','_',res$Hugo_Symbol)
+
+
+## use negative-binomial regression to model the predicted number of composite-mutant samples per gene by chance
+m <- glm.nb(composites ~ offset(log(samples)) + reptime + cds_length + percentage_gene_gc_content + panel_introduced + tcn + hic, data=res)
+predictions <- predict(m,newdata=res,type='response')
+res$predicted_proportion <- predictions / res$samples
+res$observed_proportion <- res$composites / res$samples
+dat <- res[,c('Hugo_Symbol','composites','samples','predicted_proportion','observed_proportion'),with=F]
+
+
+## test each gene for enriched or depleted composite mutant samples
+test_gene <-function(dat) {
+    x <- tryCatch({
+        tst <- binom.test(dat$composites,dat$samples,dat$predicted_proportion,alternative='greater')
+        p_enriched <- tst$p.value
+        tst2 <- binom.test(dat$composites,dat$samples,dat$predicted_proportion,alternative='two.sided')
+        p_twosided <- tst2$p.value
+        list(p_enriched=p_enriched, p_twosided=p_twosided)
+    },error=function(e) {
+        list(p_enriched=as.numeric(NA), p_twosided=as.numeric(NA))
+    })
+    dat$p_enriched <- x$p_enriched
+    dat$p_twosided <- x$p_twosided
+    dat
+}
+dat <- dat[,test_gene(.SD),by=Hugo_Symbol]
+dat$logOR <- log2(dat$observed_proportion/dat$predicted_proportion)
+x <- gene_info[,c('Hugo_Symbol','Role'),with=F]
+x$Hugo_Symbol <- gsub('-','_',x$Hugo_Symbol)
+dat <- merge(dat, x,by='Hugo_Symbol', all.x=T)
+dat <- dat[order(p_enriched,decreasing=F),]
+dat$q_enriched <- p.adjust(dat$p_enriched,method='BH')
+dat$q_twosided <- p.adjust(dat$p_twosided,method='BH')
+
+## save results
+write.tsv(dat, '/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/gene_enrichment_AICDAmuts.txt')
+
+
+
+gene_acida_enrich<-dat
+##On
+gene_acida_enrich<-gene_acida_enrich[gene_acida_enrich$observed_proportion>0,]
+##Only significant (Q<0.01) 
+gene_acida_enrich$Hugo_Symbol[gene_acida_enrich$q_enriched < 0.01]
+###########################
+#################
+#######"
+
+
+
+#######
+####
+##############Ploting....4A
+
+genes <- fread(here('/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/gene_enrichment_AICDAmuts.txt')) 
+genes_included <- genes$Hugo_Symbol[genes$q_enriched < 0.01] #
+genes_included <- gsub('_','-',genes_included)
+
+## get cancer-types to plot
+ctypes <- fread(here('data/cancertype_enrichment_permutation_test_precalculated.txt')) ##This file was obtained from the original article...
+ctypes <- ctypes[tumortype!='Other',]
+ctypes <- ctypes[order(obs,decreasing=F),]
+included_types <- ctypes$tumortype[ctypes$N >= 100]
+ctypes <- ctypes[tumortype %in% included_types,]
+
+## get composite rate per gene per maintype
+d <- Composite_maf_muts[, c('metamaintype','Tumor_Sample_Barcode','Hugo_Symbol','exclude','putative_resistance_mutation',"AICDA_mutation")]
+d<-as.data.table(d)#Transform to data.table
+
+
+d <- d[putative_resistance_mutation==F & exclude==F , c('metamaintype','Tumor_Sample_Barcode','Hugo_Symbol',"AICDA_mutation"),with=F]
+d <- d[Hugo_Symbol %in% genes_included & metamaintype %in% ctypes$tumortype,]
+
+count_patients <- function(d) {
+    tbl <- table.freq(d$Tumor_Sample_Barcode)
+    samples <- tbl$value
+    composite_samples <- tbl$value[tbl$N > 1]
+    ns <- length(unique(strtrim(samples,9)))
+    nc <- length(unique(strtrim(composite_samples,9)))
+    list(n_patients=ns, n_composite=nc)
+}
+#Redefine Funcition too
+count_patients2 <- function(d,AICDA=TRUE) {
+    tbl <- table.freq(d$Tumor_Sample_Barcode)
+    samples <- tbl$value[tbl$N > 0]
+    if (AICDA==TRUE) {
+       ###For AICDA condition
+tbl$composite <- tbl$N > 1
+tbl[,N:=NULL]
+d <- merge(d, tbl, by.x='Tumor_Sample_Barcode', by.y='value', all.x=T)
+tbl <- table.freq(d$Tumor_Sample_Barcode)
+ #For AICDA, Subset to AICDA
+
+composite_samples <- d$Tumor_Sample_Barcode[d$AICDA_mutation=="YES"&d$composite=="TRUE"] #COmposites with AICDA mutation
+    
+    
+    }
+    if (AICDA==FALSE){
+    composite_samples <- tbl$value[tbl$N > 1]
+    }
+    
+    ## don't overcount multiple samples per patient
+    ns <- length(unique(strtrim(samples,9)))
+    nc <- length(unique(strtrim(composite_samples,9)))
+    
+    
+    list(n_patients=ns, n_composite=nc)
+}
+
+
+
+
+info <- d[,count_patients2(.SD),by=c('Hugo_Symbol','metamaintype')]
+info$prop <- info$n_composite / info$n_patients
+info$Hugo_Symbol <- factor(info$Hugo_Symbol, levels=rev(sortunique(genes_included)))
+info$metamaintype <- factor(info$metamaintype, levels=ctypes$tumortype)
+
+m_prop <- reshape(info[,c('metamaintype','Hugo_Symbol','prop'),with=F],timevar='metamaintype',idvar='Hugo_Symbol',direction='wide')
+m_prop_melt <- melt(m_prop)
+m_prop_melt$variable <- gsub('prop[.]','',m_prop_melt$variable)
+setnames(m_prop_melt,'value','prop')
+
+m_n <- reshape(info[,c('metamaintype','Hugo_Symbol','n_composite'),with=F],timevar='metamaintype',idvar='Hugo_Symbol',direction='wide')
+m_n_melt <- melt(m_n)
+m_n_melt[value==0,value:=NA]
+m_n_melt$variable <- gsub('n_composite[.]','',m_n_melt$variable)
+setnames(m_n_melt,'value','n')
+
+pd <- merge(m_n_melt,m_prop_melt,by=c('Hugo_Symbol','variable'),all=T)
+pd$variable <- factor(pd$variable, levels=ctypes$tumortype)
+setnames(pd,'variable','metamaintype')
+pd[n < 1, n:=NA] #CHange though numbers are very low
+pd[is.na(n),prop:=NA] #This data is the one saved to do the plot 4A
+
+```
+
+
+```{r panel_5a, fig.width=20,fig.height=18}
+####Load pre-calculated data.....
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+pd<-as.data.table(read.delim("Data/Figure5/Figure5a.tab"))
+
+  ## plot the heatmap
+p_heatmap <- ggplot(pd, aes(x=metamaintype,y=Hugo_Symbol)) +
+    geom_point(pch=21,color='black',aes(fill=prop,size=n)) +
+    scale_fill_gradient(low='white',high='steelblue',name = "Proportion with \nAID composite") +
+    theme_bw(base_size=14) +
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    labs(x=NULL,y=NULL)
+p_heatmap <- extract_gglegend(p_heatmap)
+
+## prep data for side-by-side obs:exp barplots
+
+## get cancer-types to plot
+ctypes <- fread(('Data/Figure5/Raw_calculations/cancertype_enrichment_permutation_test_precalculated.txt'))
+ctypes <- ctypes[tumortype!='Other',]
+ctypes <- ctypes[order(obs,decreasing=F),]
+included_types <- ctypes$tumortype[ctypes$N >= 100]
+ctypes <- ctypes[tumortype %in% included_types,]
+
+##
+pd2 <- ctypes
+pd2$tumortype <- factor(pd2$tumortype, levels=pd2$tumortype)
+pd2$obs <- 100*pd2$obs
+pd2[,mu:=100*mu]
+pd2[,lwr:=100*lwr]
+pd2[,upr:=100*upr]
+
+pd2.exp <- pd2[,c('tumortype','mu','lwr','upr'),with=F]
+names(pd2.exp) <- c('tt','mu','lwr','upr')
+pd2.exp$type <- 'Expected'
+
+ci <- as.data.table(binom.confint(pd2$x,pd2$N,method='exact'))
+ci$tumortype <- pd2$tumortype
+
+pd2.obs <- pd2[,c('tumortype','obs'),with=F]
+names(pd2.obs) <- c('tt','mu')
+pd2.obs$type <- 'Observed'
+
+pd3 <- rbind(pd2.exp,pd2.obs, fill=T)
+pd3 <- merge(pd3, pd2[,c('tumortype','q.value','logOR'),with=F], by.x='tt', by.y='tumortype',all.x=T)
+pd3$direction <- 'Not significant (q>=0.05)'
+pd3[logOR < 0 & q.value < 0.01,direction:='Depleted']
+pd3[logOR > 0 & q.value < 0.01,direction:='Enriched']
+pd3$tt <- factor(pd3$tt, levels=levels(pd2$tumortype))
+
+cols <- c('steelblue','#BFBFBF')
+names(cols) <- c('Observed','Expected')
+
+p_hist <- ggplot(pd3, aes(x=tt,y=mu,group=type)) +
+    geom_bar(stat='identity',aes(fill=type),position=position_dodge(width=0.9),color='white') +
+    scale_fill_manual(values=cols,name='Enrichment') + 
+    geom_errorbar(aes(min=lwr,max=upr),position=position_dodge(width=0.9),width=NA,color='black') +
+    theme_std(base_size=14) +
+    scale_y_continuous(expand=c(0,0),breaks=seq(0,60,by=20),limits=c(0,60)) +
+    theme(axis.text.x=element_blank(),axis.ticks.x=element_blank()) +
+    labs(x=NULL,y='% of cases with global composite mutations')
+p_hist <- extract_gglegend(p_hist)
+
+p <- plot_grid(p_hist$plot, p_heatmap$plot, align='v', ncol=1, nrow=2,rel_heights=c(4,6))    
+p_legend <- plot_grid(p_hist$legend, p_heatmap$legend, align='v', ncol=1, nrow=2)    
+p <- plot_grid(p, p_legend, ncol=2, nrow=1, rel_widths=c(6,1))    
+p_mut_enrich_bycancer<-p
+
+
+p_mut_enrich_bycancer
+##
+#ggsave(p_mut_enrich_bycancer,filename = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/Gene_enricy_AICDAcomposite_byTumor.png",height = 18,width = 20)
+
+##############
+```
+
+
+
+***
+
+\pagebreak
+
+# Supplementary Figure 17a
+
+```{r  panelSup_17a_cals,echo=T,eval=F,fig.show="hide"}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+###Figures Supplementary Figure 17a  Adding AICDA data
+## load mutation data
+#d <- fread(here('data/data_mutations.txt.gz'),select=c('exclude','putative_resistance_mutation','Tumor_Sample_Barcode','Hugo_Symbol','Role')), ####Original
+
+d<-Composite_maf_muts[,c('exclude','putative_resistance_mutation','Tumor_Sample_Barcode','Hugo_Symbol','Role',"AICDA_mutation")] #Add AICDA column
+d <- d[d$exclude==FALSE & d$putative_resistance_mutation==FALSE,]
+d$id <- paste(d$Tumor_Sample_Barcode,d$Hugo_Symbol)
+tbl <- table.freq(d$id)
+tbl$composite <- tbl$N > 1
+tbl[,N:=NULL]
+d <- merge(d, tbl, by.x='id', by.y='value', all.x=T)
+#clin <- fread(here('data/data_clinical.txt.gz')) ##Original
+clin<-Composite_clinical
+clin <- clin[clin$exclude==FALSE,]
+N_patients <- length(unique(clin$PATIENT_ID))
+
+#d <- d[!duplicated(d$id),] ##Do this if you want the information by gene
+d_AICDA<-d[d$AICDA_mutation%in%"YES",] #For AICDA
+d <- as.data.frame.matrix(xtabs(~Role + composite, data=d))
+names(d) <- c('singleton','composite')
+d <- cbind(role=rownames(d), adt(d))
+d$prop <- d$composite / (d$singleton + d$composite)
+
+### prep for plot
+n_composite_onc <- d[role=='Oncogene','composite',with=F][[1]]
+n_singleton_onc <- d[role=='Oncogene','singleton',with=F][[1]]
+n_mutant_onc <- n_composite_onc + n_singleton_onc
+ci_onc <- binom.confint(n_composite_onc, n_mutant_onc, methods='exact')
+n_composite_tsg <- d[role=='TSG','composite',with=F][[1]]
+n_singleton_tsg <- d[role=='TSG','singleton',with=F][[1]]
+n_mutant_tsg <- n_composite_tsg + n_singleton_tsg
+ci_tsg <- binom.confint(n_composite_tsg, n_mutant_tsg, methods='exact')
+ci_onc$Role <- 'Oncogenes'
+ci_tsg$Role <- 'TSGs'
+ci <- adt(rbind(ci_onc, ci_tsg))
+ci$label <- paste0(ci$x,'/',ci$n)
+ci[,c('mean','lower','upper'):=list(100*mean,100*lower,100*upper)]
+ci$Role <- factor(ci$Role, levels=c('TSGs','Oncogenes'))
+#
+### p-value based on two-sample z test for diff in proportions
+tst <- prop.test(c(n_composite_onc,n_composite_tsg),c(n_mutant_onc,n_mutant_tsg))
+pval <- tst$p.value
+pval_label <- paste0('p=',prettyNum(pval,digits=1)) ###Only save the label
+
+
+
+
+
+###Add AICDA data
+###
+#d_AICDA
+####Subset to only composite mutations...
+d_AICDA<-d_AICDA[d_AICDA$composite==TRUE,]
+tbl <- table.freq(d_AICDA$id)
+tbl$composite_AICDA_only <- tbl$N > 1
+tbl[,N:=NULL]
+d_AICDA <- merge(d_AICDA, tbl, by.x='id', by.y='value', all.x=T)
+
+d_AICDA2 <- as.data.frame.matrix(xtabs(~Role + composite_AICDA_only, data=d_AICDA))
+names(d_AICDA2) <- c('composite','composite_AICDA_only')
+d_AICDA2 <- cbind(role=rownames(d_AICDA2), adt(d_AICDA2))
+d_AICDA2$prop_only <- d_AICDA2$composite_AICDA_only / (d$singleton + d$composite)
+d_AICDA2$prop_compo <- d_AICDA2$composite / (d$singleton + d$composite)
+### prep for plot
+##For AICDA only
+n_composite_onc <- d_AICDA2[role=='Oncogene','composite_AICDA_only',with=F][[1]]
+n_singleton_onc <- d_AICDA2[role=='Oncogene','composite',with=F][[1]]
+n_mutant_onc <-d[role=='Oncogene','composite',with=F][[1]]+ d[role=='Oncogene','singleton',with=F][[1]] #ALL mutations..;
+ci_onc <- binom.confint(n_composite_onc, n_mutant_onc, methods='exact')
+n_composite_tsg <- d_AICDA2[role=='TSG','composite_AICDA_only',with=F][[1]]
+n_singleton_tsg <- d_AICDA2[role=='TSG','composite',with=F][[1]]
+n_mutant_tsg <- d[role=='TSG','composite',with=F][[1]]+ d[role=='TSG','singleton',with=F][[1]] #ALL mutations..;
+ci_tsg <- binom.confint(n_composite_tsg, n_mutant_tsg, methods='exact')
+ci_onc$Role <- 'Oncogenes'
+ci_tsg$Role <- 'TSGs'
+
+##For the others...
+ci_onc2 <- binom.confint(n_singleton_onc, n_mutant_onc, methods='exact')
+ci_tsg2 <- binom.confint(n_singleton_tsg, n_mutant_tsg, methods='exact')
+ci_onc2$Role <- 'Oncogenes'
+ci_tsg2$Role <- 'TSGs'
+
+##Add data to previous one
+ci$Variable<-c("All_muts","All_muts")
+ci2<-adt(rbind(ci_onc, ci_tsg,ci_onc2, ci_tsg2))
+
+ci2$label <- paste0(ci2$x,'/',ci2$n)
+ci2[,c('mean','lower','upper'):=list(100*mean,100*lower,100*upper)]
+ci2$Role <- factor(ci2$Role, levels=c('TSGs','Oncogenes'))
+#
+### p-value based on two-sample z test for diff in proportions
+tst <- prop.test(c(n_composite_onc,n_composite_tsg),c(n_mutant_onc,n_mutant_tsg))
+pval <- tst$p.value
+pval_label2 <- paste0('p=',prettyNum(pval,digits=1))
+tst <- prop.test(c(n_singleton_onc,n_singleton_tsg),c(n_mutant_onc,n_mutant_tsg))
+pval <- tst$p.value
+pval_label3 <- paste0('p=',prettyNum(pval,digits=1))
+ci2$Variable<-c("Composite AICDA only","Composite AICDA only","Composite AICDA","Composite AICDA")
+
+####Re-do for not AICDA mutations
+n_composite_onc <- d[role=='Oncogene','composite',with=F][[1]]-sum(ci2$x[ci2$Role%in%"Oncogenes"])
+
+ci_onc <- binom.confint(n_composite_onc, n_mutant_onc, methods='exact')
+n_composite_tsg <- d[role=='TSG','composite',with=F][[1]]-sum(ci2$x[ci2$Role%in%"TSGs"])
+
+ci_tsg <- binom.confint(n_composite_tsg, n_mutant_tsg, methods='exact')
+ci_onc$Role <- 'Oncogenes'
+ci_tsg$Role <- 'TSGs'
+ci <- adt(rbind(ci_onc, ci_tsg))
+ci$label <- paste0(ci$x,'/',ci$n)
+ci[,c('mean','lower','upper'):=list(100*mean,100*lower,100*upper)]
+ci$Role <- factor(ci$Role, levels=c('TSGs','Oncogenes'))
+#
+### p-value based on two-sample z test for diff in proportions
+tst <- prop.test(c(n_composite_onc,n_composite_tsg),c(n_mutant_onc,n_mutant_tsg))
+pval <- tst$p.value
+pval_label4 <- paste0('p=',prettyNum(pval,digits=1))
+
+##Merge
+ci$Variable<-c("Other origin","Other origin")
+
+
+
+ci<-rbind(ci,ci2)
+
+##Modify for stacked plot
+##Redorder
+ci<-ci[c(3:4,5:6,1:2),]
+ci$mean_stacked<-0
+ci$mean_stacked[c(1:2)]<-ci$mean[c(1:2)] #Lower values are the same
+ci$mean_stacked[c(3:4)]<-ci$mean[c(3:4)]-ci$mean[c(1:2)]# This is part of (AICDA mutations)
+ci$mean_stacked[c((5:6))]<-ci$mean[c(5:6)]-(ci$mean[c(3:4)])
+
+  ci$Variable <- factor(ci$Variable,levels = c("Other origin","Composite AICDA","Composite AICDA only"))
+##Data for Remaining (NO AICDA mutations)
+  
+
+```
+
+
+```{r panel_Sup_17a, fig.width=21,fig.height=15}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#Import data for plotting
+ci<-as.data.table(read.delim("Data/Figure5/FigureSup_17a.tab"))
+
+
+#See calculations section (obtained from there, simplify here...)
+pval_label3<-"p=0.4"
+pval_label2<-"p=0.05"
+pval_label<-"p=5e-270"
+pval_label4<-"p=2e-278" 
+
+ci$Role <- factor(ci$Role, levels=c('TSGs','Oncogenes'))
+ci$Variable <- factor(ci$Variable,levels = c("Other origin","Composite AICDA","Composite AICDA only"))
+##Data for Remaining (NO AICDA mutations)
+
+### plot
+p_composite_cases <-ggplot(ci,aes(x=Role,y=mean_stacked)) +
+    geom_bar(stat='identity',aes(fill=Variable)) + 
+    geom_errorbar(aes(min=lower,max=mean),color='white',size=0.5,width=0) +
+    geom_errorbar(aes(min=mean,max=upper),color='black',size=0.5,width=0) +scale_fill_manual(values=c("lightgray", "#999999", "#F8766D"),name = "Composite mutation type", labels = c("Other origin", "AICDA induced >= 1", "Only AICDA induced"))+geom_signif(comparisons=list(c("Oncogenes", "TSGs")), y_position = c(12.7), tip_length = 0.01, annotations=pval_label3,color="#F8766D")+geom_signif(comparisons=list(c("Oncogenes", "TSGs")), y_position = c(13.2), tip_length = 0.01, annotations=pval_label2,color="#999999")+geom_signif(comparisons=list(c("Oncogenes", "TSGs")), y_position = c(13.8), tip_length = 0.01, annotations=pval_label,color="lightgray")+geom_signif(comparisons=list(c("Oncogenes", "TSGs")), y_position = c(14.5), tip_length = 0.01, annotations=pval_label4,color="black") +geom_text(aes(y=upper, label=x),color=c("white","white","white","white","black","black"), size=3.5,vjust=-1)+coord_flip()+scale_y_continuous(expand=c(0,0),limits=c(0,16.0),breaks=seq(0,14,by=2),position='right') +theme_std(base_size=14) + labs(x=NULL,y='% of all mutations that\nwere composite')+annotate("text", label=c(paste0("All mutations n = ",ci$n[1]),paste0("All mutations n = ",ci$n[2])), x=c(1.9,0.9),y=c(ci$upper[5]+1,ci$upper[6]+1), fontface =2,size=5)
+ #theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+
+####Now plot to compare % of AICDA > 1 vs Other Origin
+
+#Data
+f_dat<-data.frame(Other_origin=c(ci$x[5],ci$x[6]),AICDA_induced=c(ci$x[1]+ci$x[3],ci$x[2]+ci$x[4]),row.names = c("Oncogene","TSGs"))
+pval <- fisher.test(f_dat)$p.value
+pval_label5 <- paste0('P~',round(pval,3))
+res2<-f_dat
+res2 <- res2 / rowSums(res2)
+role_order <- c('Oncogene','TSGs')
+res2 <- cbind(Role=role_order,res2)
+dat2 <- melt(res2,id.var='Role')
+dat2$Role <- factor(dat2$Role,levels=role_order)
+dat2$value <- 100*dat2$value
+ci_AI <- binom.confint(f_dat$AICDA_induced,(f_dat$AICDA_induced + f_dat$Other_origin),method='exact')
+ci_AI$Role <- res2$Role
+ci_AI$Role <- factor(ci_AI$Role, levels=c("TSGs",'Oncogene'))
+setnames(ci_AI,'mean','value')
+ci_AI$value <- 100*ci_AI$value
+ci_AI$lower <- 100*ci_AI$lower
+ci_AI$upper <- 100*ci_AI$upper
+ci_AI$Role <- factor(ci_AI$Role, levels=c('TSGs','Oncogene'))
+dat2$Role<-factor(dat2$Role, levels=c('TSGs','Oncogene'))
+
+p <- ggplot(dat2, aes(x=Role,y=value)) +
+    geom_bar(stat='identity',aes(fill=variable)) +
+    geom_signif(comparisons=list(c("Oncogene", "TSGs")), y_position =105, tip_length = 0, annotations=pval_label5)+scale_fill_manual(values=c("lightgray", "#999999"),name = "Composite mutation type", labels = c("Other origin", "AICDA induced >= 1"))+   geom_errorbar(data=ci_AI,aes(min=lower,max=value),color='white',width=0) +
+    geom_errorbar(data=ci_AI,aes(min=value,max=upper),color='black',width=0) +
+    scale_y_continuous(expand=c(0,0),limits=c(0,115),breaks=seq(0,100,by=25),position='right') +
+    labs(x=NULL,y='% of composite mutants') +
+    theme_std(base_size=14) +
+    theme(legend.position='none') + #axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    coord_flip()
+
+##Merge inside the other
+##Grab
+# called a "grop" in Grid terminology
+xbp_grob <- ggplotGrob(p)
+
+p_composite_cases2<-p_composite_cases + annotation_custom(grob = xbp_grob, xmin = 1.75, xmax = 2.25, 
+                                      ymin = 8.5, ymax = 11.7)
+
+p_composite_cases2
+```
+
+***
+
+\pagebreak
+
+# Supplementary Figure 17b
+
+```{r  panelSup_17b_cals,echo=T,eval=F,fig.show="hide"}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#####Figure 4C, truncating mutations
+
+## load phased data with pairwise-mutation comparison
+Composite_phased <- fread(('data/data_mutations_phased.txt.gz')) #Import data, this contains the composite pairs
+##Add which one is AICDA to mutation on position.1 and position.2 obtained from https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations_phased.txt.gz
+
+
+#####You need to have ran previous sections....
+Composite_phased$AICDA_mutation.1<-ifelse(paste0(Composite_phased$Tumor_Sample_Barcode,"-",Composite_phased$Start_Position.1,"-",Composite_phased$mutationid.1,"-",Composite_phased$t_alt_count.1)%in%Composite_maf_muts$Mut_identifier[Composite_maf_muts$AICDA_mutation%in%"YES"],"YES","NO")
+
+Composite_phased$AICDA_mutation.2<-ifelse(paste0(Composite_phased$Tumor_Sample_Barcode,"-",Composite_phased$Start_Position.2,"-",Composite_phased$mutationid.2,"-",Composite_phased$t_alt_count.2)%in%Composite_maf_muts$Mut_identifier[Composite_maf_muts$AICDA_mutation%in%"YES"],"YES","NO")
+
+Composite_phased$AICDA_present<-ifelse(Composite_phased$AICDA_mutation.1=="YES"|Composite_phased$AICDA_mutation.2=="YES","YES","NO")
+
+#####
+
+
+###Save this data.frame
+
+write.table(Composite_phased,quote = F,sep = "\t",row.names = F,file = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/Composite_phased_Mutations.maf")
+
+###
+d<-Composite_phased
+d<-d[,c('Tumor_Sample_Barcode','exclude','putative_resistance_mutation.1','putative_resistance_mutation.2','truncating.1','truncating.2','Role','Hugo_Symbol',"AICDA_mutation.1","AICDA_mutation.2")]
+
+
+###All composite mutations graph
+d <- d[exclude==F & putative_resistance_mutation.1==F & putative_resistance_mutation.2==F,]
+d$Class <- ''
+d[truncating.1==F & truncating.2==F,Class:='Non-truncating/Non-truncating']
+d[(truncating.1==T & truncating.2==F | truncating.1==F & truncating.2==T),Class:='Non-truncating/Truncating']
+d[truncating.1==T & truncating.2==T,Class:='Truncating/Truncating']
+d <- d[Role %in% c('Oncogene','TSG'),]
+
+## don't overcount 3+ mutation composite-mutations; using unique sample/gene/Class counts
+d$id <- paste(d$Tumor_Sample_Barcode, d$Hugo_Symbol, d$Class)
+d <- d[!duplicated(id),c('Tumor_Sample_Barcode','Hugo_Symbol','Class','Role','id'),with=F]
+dd <- d
+dd[Class!='Non-truncating/Non-truncating',Class:='1 or both are truncating']
+dd$Class <- factor(dd$Class,levels=(c('Non-truncating/Non-truncating','1 or both are truncating')))
+
+cols <- c('#2D92BA','#B7DAEA')
+names(cols) <- rev(levels(dd$Class))
+
+
+
+
+
+## for each gene, get its singleton/composite counts
+summarize_gene <- function(d) {
+    n_missense_missense <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$Class=='Non-truncating/Non-truncating'],9)))
+    n_any_truncating <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$Class=='1 or both are truncating'],9)))
+    tbl <- list(`Non-truncating/Non-truncating`=n_missense_missense, `1 or both are truncating`=n_any_truncating)
+    tbl
+}
+res <- dd[,summarize_gene(.SD),by=c('Role')]
+role_order <- c('Oncogene','TSG')
+pval <- fisher.test(res[,(2:3),with=F])$p.value
+pval_label <- paste0('P~',pval)
+
+res$Role <- factor(res$Role, levels=role_order)
+res <- res[order(Role),]
+res2 <- res
+res2[,Role:=NULL]
+res2 <- res2 / rowSums(res2)
+res2 <- cbind(Role=role_order,res2)
+dat2 <- melt(res2,id.var='Role')
+dat2$Role <- factor(dat2$Role,levels=role_order)
+dat2$value <- 100*dat2$value
+ci <- binom.confint(res$`1 or both are truncating`,(res$`1 or both are truncating` + res$`Non-truncating/Non-truncating`),method='exact')
+ci$Role <- res2$Role
+ci$Role <- factor(ci$Role, levels=c('Oncogene','TSG'))
+setnames(ci,'mean','value')
+ci$value <- 100*ci$value
+ci$lower <- 100*ci$lower
+ci$upper <- 100*ci$upper
+ci$Role <- factor(ci$Role, levels=c('TSG','Oncogene'))
+
+###Only at least one AICDA composite mutation
+
+d<-Composite_phased[Composite_phased$AICDA_present%in%"YES",]
+d<-d[,c('Tumor_Sample_Barcode','exclude','putative_resistance_mutation.1','putative_resistance_mutation.2','truncating.1','truncating.2','Role','Hugo_Symbol',"AICDA_mutation.1","AICDA_mutation.2")]
+d <- d[exclude==F & putative_resistance_mutation.1==F & putative_resistance_mutation.2==F,]
+d$Class <- ''
+d[truncating.1==F & truncating.2==F,Class:='Non-truncating/Non-truncating']
+d[(truncating.1==T & truncating.2==F | truncating.1==F & truncating.2==T),Class:='Non-truncating/Truncating']
+d[truncating.1==T & truncating.2==T,Class:='Truncating/Truncating']
+d <- d[Role %in% c('Oncogene','TSG'),]
+
+## don't overcount 3+ mutation composite-mutations; using unique sample/gene/Class counts
+d$id <- paste(d$Tumor_Sample_Barcode, d$Hugo_Symbol, d$Class)
+d <- d[!duplicated(id),c('Tumor_Sample_Barcode','Hugo_Symbol','Class','Role','id'),with=F]
+dd <- d
+dd[Class!='Non-truncating/Non-truncating',Class:='1 or both are truncating']
+dd$Class <- factor(dd$Class,levels=(c('Non-truncating/Non-truncating','1 or both are truncating')))
+
+cols <- c( "darkred","#F8766D") ##Change
+names(cols) <- rev(levels(dd$Class))
+
+###
+
+
+
+
+## for each gene, get its singleton/composite counts
+summarize_gene <- function(d) {
+    n_missense_missense <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$Class=='Non-truncating/Non-truncating'],9)))
+    n_any_truncating <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$Class=='1 or both are truncating'],9)))
+    tbl <- list(`Non-truncating/Non-truncating`=n_missense_missense, `1 or both are truncating`=n_any_truncating)
+    tbl
+}
+res <- dd[,summarize_gene(.SD),by=c('Role')]
+role_order <- c('Oncogene','TSG')
+pval <- fisher.test(res[,(2:3),with=F])$p.value
+pval_label <- paste0('P~',round(pval,3))
+
+res$Role <- factor(res$Role, levels=role_order)
+res <- res[order(Role),]
+res2 <- res
+res2[,Role:=NULL]
+res2 <- res2 / rowSums(res2)
+res2 <- cbind(Role=role_order,res2)
+dat2 <- melt(res2,id.var='Role')
+dat2$Role <- factor(dat2$Role,levels=role_order)
+dat2$value <- 100*dat2$value
+ci <- binom.confint(res$`1 or both are truncating`,(res$`1 or both are truncating` + res$`Non-truncating/Non-truncating`),method='exact')
+ci$Role <- res2$Role
+ci$Role <- factor(ci$Role, levels=c('Oncogene','TSG'))
+setnames(ci,'mean','value')
+ci$value <- 100*ci$value
+ci$lower <- 100*ci$lower
+ci$upper <- 100*ci$upper
+ci$Role <- factor(ci$Role, levels=c('TSG','Oncogene'))
+
+
+```
+
+
+```{r panel_Sup_17b, fig.width=18,fig.height=12}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+##Import data
+ci<-as.data.table(read.delim("Data/Figure5/FigureSup_17a_1A.tab"))
+dat2<-as.data.table(read.delim("Data/Figure5/FigureSup_17a_1B.tab"))
+
+ role_order<-c("Oncogene" ,"TSG")     
+pval_label<-"P~0" #From calculations
+ci$Role <- factor(ci$Role, levels=c('TSG','Oncogene'))
+dat2$Role <- factor(dat2$Role,levels=role_order)
+cols <- c('#2D92BA','#B7DAEA')
+names(cols) <- rev(unique(dat2$variable))
+dat2$variable <- factor(dat2$variable,levels=(c('Non-truncating/Non-truncating','1 or both are truncating')))
+
+
+p1 <- ggplot(dat2, aes(x=Role,y=value)) +
+    geom_bar(stat='identity',aes(fill=variable)) +
+    geom_signif(comparisons=list(c("Oncogene", "TSG")), y_position =105, tip_length = 0, annotations=pval_label) + 
+    scale_fill_manual(values=cols,name='Consequence') +
+    geom_errorbar(data=ci,aes(min=lower,max=value),color='white',width=0) +
+    geom_errorbar(data=ci,aes(min=value,max=upper),color='black',width=0) +
+    scale_y_continuous(expand=c(0,0),limits=c(0,115),breaks=seq(0,100,by=25),position='right') +
+    labs(x=NULL,y='% of all composite mutants') +
+    theme_std(base_size=14) +
+    theme(legend.position='bottom') + #axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    coord_flip()
+
+
+#####Second part of the panel (right plot)
+#Import data
+
+##Import data
+ci<-as.data.table(read.delim("Data/Figure5/FigureSup_17a_2A.tab"))
+dat2<-as.data.table(read.delim("Data/Figure5/FigureSup_17a_2B.tab"))
+
+ role_order<-c("Oncogene" ,"TSG")     
+pval_label<-"P~0" #From calculations
+ci$Role <- factor(ci$Role, levels=c('TSG','Oncogene'))
+dat2$Role <- factor(dat2$Role,levels=role_order)
+dat2$variable <- factor(dat2$variable,levels=(c('Non-truncating/Non-truncating','1 or both are truncating')))
+
+cols <- c( "darkred","#F8766D") ##Change
+names(cols) <- rev(unique(dat2$variable))
+
+
+p2 <- ggplot(dat2, aes(x=Role,y=value)) +
+    geom_bar(stat='identity',aes(fill=variable)) +
+    geom_signif(comparisons=list(c("Oncogene", "TSG")), y_position =105, tip_length = 0, annotations=pval_label) + 
+    scale_fill_manual(values=cols,name='Consequence') +
+    geom_errorbar(data=ci,aes(min=lower,max=value),color='white',width=0) +
+    geom_errorbar(data=ci,aes(min=value,max=upper),color='black',width=0) +
+    scale_y_continuous(expand=c(0,0),limits=c(0,115),breaks=seq(0,100,by=25),position='right') +
+    labs(x=NULL,y='% of AICDA composite mutants') +
+    theme_std(base_size=14) +
+    theme(legend.position='bottom') + #axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    coord_flip()
+p2<-p2+ guides(fill = guide_legend(nrow = 2))
+
+###Merge using Zoom like effect
+
+grid.newpage()
+##Add rectangle
+grid.polygon(x=c(0.02, 0.02, .55, 0.55), y=c(0.05, .97, 0.97, 0.05),gp = gpar( lwd=2))
+pushViewport(viewport(y = 0.1, x=.28,height = .85, width = .5, just = c("bottom")))
+grid.draw(grid.grabExpr({print(p1)}))
+popViewport()
+##Add rectangle
+grid.polygon(x=c(0.77, 0.77, .98, 0.98), y=c(0.3, .725, 0.725, 0.3),gp = gpar( lwd=2))
+##Add rectangle
+##Add lines
+grid.lines(x = unit(c(0.55, .77), "npc"),y = unit(c(.97,.725), "npc"), gp = gpar(fill="black", lwd=2))
+grid.lines(x = unit(c(0.55, .77), "npc"),y = unit(c(.05,.3), "npc"), gp = gpar(fill="black", lwd=2))
+##Add other graph
+pushViewport(viewport(y = 0.315, x=.862,height = .4, width = .18, just = c("bottom")))
+grid.draw(grid.grabExpr({print(p2+ theme(legend.title = element_text(size = 9),legend.key.size = unit(0.5, "cm"),legend.text = element_text(size = 9)))}))
+popViewport()
+##Add text..
+grid.text(label="6.86% of \ncomposite mutations",x=unit(0.66, "npc"),y=unit(0.525, "npc"))
+
+p_compo_truncating<-recordPlot()
+
+
+p_compo_truncating
+
+```
+
+
+***
+
+\pagebreak
+
+# Supplementary Figure 17e
+
+```{r  panelSup_17e_cals,echo=T,eval=F,fig.show="hide"}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#####Figure
+
+## load phased data with pairwise-mutation comparison
+Composite_phased <- fread(('data/data_mutations_phased.txt.gz')) #Import data, this contains the composite pairs
+##Add which one is AICDA to mutation on position.1 and position.2 obtained from https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations_phased.txt.gz
+
+
+#####You need to have ran previous sections....
+Composite_phased$AICDA_mutation.1<-ifelse(paste0(Composite_phased$Tumor_Sample_Barcode,"-",Composite_phased$Start_Position.1,"-",Composite_phased$mutationid.1,"-",Composite_phased$t_alt_count.1)%in%Composite_maf_muts$Mut_identifier[Composite_maf_muts$AICDA_mutation%in%"YES"],"YES","NO")
+
+Composite_phased$AICDA_mutation.2<-ifelse(paste0(Composite_phased$Tumor_Sample_Barcode,"-",Composite_phased$Start_Position.2,"-",Composite_phased$mutationid.2,"-",Composite_phased$t_alt_count.2)%in%Composite_maf_muts$Mut_identifier[Composite_maf_muts$AICDA_mutation%in%"YES"],"YES","NO")
+
+Composite_phased$AICDA_present<-ifelse(Composite_phased$AICDA_mutation.1=="YES"|Composite_phased$AICDA_mutation.2=="YES","YES","NO")
+
+#####
+
+
+###Save this data.frame
+
+write.table(Composite_phased,quote = F,sep = "\t",row.names = F,file = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/Composite_phased_Mutations.maf")
+
+###
+d<-Composite_phased
+d<-d[,c('Tumor_Sample_Barcode','exclude','putative_resistance_mutation.1','putative_resistance_mutation.2','truncating.1','truncating.2','Role','Hugo_Symbol',"AICDA_mutation.1","AICDA_mutation.2")]
+
+
+d_phased <- Composite_phased ##This already inclused the AICDA tags
+d_mutations<-Composite_maf_muts[,c('Tumor_Sample_Barcode','exclude','Hugo_Symbol','Role','putative_resistance_mutation',
+                              'Variant_Classification','Variant_Type','tcn', 'mutationid', 'high_tmb','hotspot_class',
+                              'tm','hotspotid','HGVSp_Short','truncating','Reference_Allele','Tumor_Seq_Allele2',
+                              'Start_Position','End_Position',"AICDA_mutation")]
+
+d_mutations<-as.data.table(d_mutations)#Transform to data.table
+
+## exclude duplicates from phasing data
+d_phased$id <- paste(d_phased$mutationid.1,d_phased$mutationid.2,sep=' + ')
+d_phased <- d_phased[!duplicated(id),]
+
+get_ordered_variants <- function(d_phased, d_mutations) {
+    d_phased <- d_phased[putative_resistance_mutation.1==F & putative_resistance_mutation.2==F & exclude==F,]
+    d_phased[hotspotid.1!='',tm.1:=hotspotid.1] ## this will group IF-INDEL hotspots
+    d_phased[hotspotid.2!='',tm.2:=hotspotid.2]
+    d_phased$functional.1 <- d_phased$hotspotid.1!='' | d_phased$oncogenic.1 %in% c('Oncogenic','Likely Oncogenic','Predicted Oncogenic') |
+    (d_phased$Role %in% c('TSG','Oncogene/TSG') & d_phased$truncating.1==T) | d_phased$Variant_Classification.1=='TERT promoter'
+    d_phased$functional.2 <- d_phased$hotspotid.2!='' | d_phased$oncogenic.2 %in% c('Oncogenic','Likely Oncogenic','Predicted Oncogenic') |
+    (d_phased$Role %in% c('TSG','Oncogene/TSG') & d_phased$truncating.2==T) | d_phased$Variant_Classification.2=='TERT promoter'
+
+    d_phased[Variant_Classification.1 %in% c('TERT promoter'),tm.1:=paste0('TERT ',gsub('p[.]','',HGVSp_Short.1))]
+    d_phased[Variant_Classification.1 %in% c('Splice_Site','Nonsense_Mutation','Frame_Shift_Del','Frame_Shift_Ins'), tm.1:=paste(Hugo_Symbol,'Truncating')]
+    d_phased[Variant_Classification.2 %in% c('TERT promoter'),tm.2:=paste0('TERT ',gsub('p[.]','',HGVSp_Short.2))]
+    d_phased[Variant_Classification.2 %in% c('Splice_Site','Nonsense_Mutation','Frame_Shift_Del','Frame_Shift_Ins'), tm.2:=paste(Hugo_Symbol,'Truncating')]
+
+    d_phased <- d_phased[,c('Tumor_Sample_Barcode','Role','Hugo_Symbol','hotspot.1','hotspot.2','functional.1','functional.2',
+              'tm.1','tm.2','phase','common_reads_alt1_alt2',
+              'common_reads_alt1_ref2','common_reads_ref1_alt2','ccf_Mcopies_lower.1','ccf_Mcopies_upper.1',
+              'ccf_Mcopies_lower.2','ccf_Mcopies_upper.2','Variant_Classification.1','Variant_Classification.2','phase','same_cell_known',"AICDA_mutation.1","AICDA_mutation.2","AICDA_present"),with=F]
+
+    d_phased$firstallele <- ''
+    d_phased$secondallele <- ''
+    d_phased[ccf_Mcopies_lower.1 > ccf_Mcopies_upper.2,firstallele:=tm.1]
+    d_phased[ccf_Mcopies_lower.1 > ccf_Mcopies_upper.2,secondallele:=tm.2]
+    d_phased[ccf_Mcopies_upper.1 < ccf_Mcopies_lower.2,firstallele:=tm.2]
+    d_phased[ccf_Mcopies_upper.1 < ccf_Mcopies_lower.2,secondallele:=tm.1]
+    dd <- d_phased[,c('Tumor_Sample_Barcode','Role','Hugo_Symbol','firstallele','secondallele','phase','same_cell_known','hotspot.1','hotspot.2',
+               'functional.1','functional.2','Variant_Classification.1','Variant_Classification.2',"AICDA_mutation.1","AICDA_mutation.2","AICDA_present"),with=F]
+    dd <- dd[firstallele!='' & secondallele!='',]
+
+    ## get number of unique patients with each mutation
+    d_mutations <- d_mutations[exclude==F & putative_resistance_mutation==F,]
+    d_mutations$functional <- d_mutations$hotspot==T | d_mutations$oncogenic %in% c('Oncogenic','Likely Oncogenic','Predicted Oncogenic') |
+    (d_mutations$Role %in% c('TSG','Oncogene/TSG') & d_mutations$truncating==T) | d_mutations$Variant_Classification=='TERT promoter'
+    d_mutations[Variant_Classification %in% c('TERT promoter'),tm:=paste0('TERT ',gsub('p[.]','',HGVSp_Short))]
+    d_mutations[Variant_Classification %in% c('Splice_Site','Nonsense_Mutation','Frame_Shift_Del','Frame_Shift_Ins'), tm:=paste(Hugo_Symbol,'Truncating')]
+    d_mutations[hotspotid!='',tm:=hotspotid] ## this will group IF-INDEL hotspots
+
+    getN <- function(d_mutations) {
+        N <- length(unique(strtrim(d_mutations$Tumor_Sample_Barcode,9)))
+        list(N=N)
+    }
+    tbl <- d_mutations[,getN(.SD),by=tm]
+    setnames(tbl,'tm','value')
+
+    ## annotate first and second hits with their prevalence across full dataset
+    dd2 <- merge(dd, tbl, by.x='firstallele', by.y='value', all.x=T)
+    setnames(dd2,'N','firstallele_N')
+    dd2 <- merge(dd2, tbl, by.x='secondallele', by.y='value', all.x=T)
+    setnames(dd2,'N','secondallele_N')
+    tbl_gene <- table.freq(d_mutations$Hugo_Symbol)
+    dd2 <- merge(dd2, tbl_gene, by.x='Hugo_Symbol', by.y='value', all.x=T)
+    setnames(dd2,'N','totalN')
+
+    ## compare prevalence of each hit for signficantly more prevalent:
+    ###Fill NA with 0
+    dd2$firstallele_N[is.na(dd2$firstallele_N)]<-0
+    dd2$secondallele_N[is.na(dd2$secondallele_N)]<-0
+    first_ci <- binom::binom.confint(dd2$firstallele_N, dd2$totalN, method='exact')
+    second_ci <- binom::binom.confint(dd2$secondallele_N, dd2$totalN, method='exact')
+    dd2$prop_samples_with_first_allele <- first_ci$mean
+    dd2$prop_samples_with_first_allele_lwr <- first_ci$lower
+    dd2$prop_samples_with_first_allele_upr <- first_ci$upper
+    dd2$prop_samples_with_second_allele <- second_ci$mean
+    dd2$prop_samples_with_second_allele_lwr <- second_ci$lower
+    dd2$prop_samples_with_second_allele_upr <- second_ci$upper
+    dd2$more_common_allele <- 'no difference'
+    dd2[prop_samples_with_first_allele_lwr > prop_samples_with_second_allele_upr, more_common_allele:='first']
+    dd2[prop_samples_with_first_allele_upr < prop_samples_with_second_allele_lwr, more_common_allele:='second']
+    dd2$Hugo_Symbol <- as.character(dd2$Hugo_Symbol)
+    dd2$firstallele <- as.character(dd2$firstallele)
+    dd2$secondallele <- as.character(dd2$secondallele)
+    dd2
+} #Small bugs eddition from original code and to keep AICDA tags
+
+## plot rate of 1st more prevalent vs 2nd more prevalent
+## plot rate of 1st more prevalent vs 2nd more prevalent
+dat <- get_ordered_variants(as.data.table(d_phased), as.data.table(d_mutations))
+
+dat <- dat[same_cell_known==T | phase=='cis',] ## only consider composites definitely in same cell
+dat$n_functional <- dat$functional.1 + dat$functional.2
+dat <- dat[n_functional == 2,]
+dat <- dat[more_common_allele!='no difference',]
+
+############
+
+m <- as.data.frame.matrix(xtabs(~Role + more_common_allele, data=dat[Role %in% c('Oncogene','TSG')]))
+m$overall <- m$first + m$second
+
+## for both Onc/TSG, test if ratio is sig different than 50% (binomial test)
+onc_p <- binom.test(m$first[1], m$overall[1], p=0.5,alternative='two.sided')$p.value
+tsg_p <- binom.test(m$first[2], m$overall[2], p=0.5,alternative='two.sided')$p.value
+
+## format for the plot
+ci <- adt(binom.confint(m$first, m$overall, method='exact'))
+ci$role <- rownames(m)
+m <- cbind(role=rownames(m), adt(ci))
+m1 <- m[,c('role','mean'),with=F]
+m1$first <- 'Yes'
+m2 <- m[,c('role','mean'),with=F]
+m2$mean <- 1-m2$mean
+m2$first <- 'No'
+m <- rbind(m1,m2)
+m$mean <- 100*m$mean
+ci$lower <- ci$lower * 100
+ci$upper <- ci$upper * 100
+ci$mean <- ci$mean * 100
+ci1 <- ci
+ci1$first <- 'Yes'
+ci2 <- ci
+ci2$first <- 'No'
+ci2[,lower:=NA]
+ci2[,upper:=NA]
+ci2[,mean:=NA]
+ci <- rbind(ci1,ci2)
+
+m$first <- factor(m$first, levels=c('No','Yes'))
+ci$first <- factor(ci$first, levels=c('No','Yes'))
+m <- m[order(role,first),]
+ci <- ci[order(role,first),]
+cols <- c('#B7DBEA','#1B89AD')
+names(cols) <- levels(m$first)
+plabs <- paste0('P=',prettyNum(c(onc_p,tsg_p),digits=1))
+m$label <- as.character(NA)
+m[first=='Yes',label:=plabs]
+
+p <- ggplot(m, aes(x=role,y=mean)) +
+    geom_bar(stat='identity',aes(fill=first)) + 
+    geom_text(aes(label=label),y=20) + 
+    geom_errorbar(data=ci, aes(min=`mean`,max=upper),color='black',width=0) +
+    geom_errorbar(data=ci, aes(min=lower,max=`mean`),color='white',width=0) +
+    geom_hline(yintercept=50,color='red',size=0.5,linetype='dashed') +
+    scale_fill_manual(values=cols, name='More prevalent\nallele mutated\nfirst:') +
+    theme_std(base_size=14) +
+    scale_y_continuous(expand=c(0,0),position='right') + 
+    labs(x=NULL,y='% timeable composite mutations') + 
+    theme(strip.background=element_blank()) +
+    coord_flip()
+ ###This is for global mutations
+##########This is Supplemental Figure 15A
+
+
+###NOW AICDA only
+
+m <- as.data.frame.matrix(xtabs(~Role + more_common_allele, data=dat[Role %in% c('Oncogene','TSG')&dat$AICDA_present=="YES",]))
+m$overall <- m$first + m$second
+
+## for both Onc/TSG, test if ratio is sig different than 50% (binomial test)
+onc_p <- binom.test(m$first[1], m$overall[1], p=0.5,alternative='two.sided')$p.value
+tsg_p <- binom.test(m$first[2], m$overall[2], p=0.5,alternative='two.sided')$p.value
+
+## format for the plot
+ci <- adt(binom.confint(m$first, m$overall, method='exact'))
+ci$role <- rownames(m)
+m <- cbind(role=rownames(m), adt(ci))
+m1 <- m[,c('role','mean'),with=F]
+m1$first <- 'Yes'
+m2 <- m[,c('role','mean'),with=F]
+m2$mean <- 1-m2$mean
+m2$first <- 'No'
+m <- rbind(m1,m2)
+m$mean <- 100*m$mean
+ci$lower <- ci$lower * 100
+ci$upper <- ci$upper * 100
+ci$mean <- ci$mean * 100
+ci1 <- ci
+ci1$first <- 'Yes'
+ci2 <- ci
+ci2$first <- 'No'
+ci2[,lower:=NA]
+ci2[,upper:=NA]
+ci2[,mean:=NA]
+ci <- rbind(ci1,ci2)
+
+m$first <- factor(m$first, levels=c('No','Yes'))
+ci$first <- factor(ci$first, levels=c('No','Yes'))
+m <- m[order(role,first),]
+ci <- ci[order(role,first),]
+cols <- c('#B7DBEA','#1B89AD')
+names(cols) <- levels(m$first)
+plabs <- paste0('P=',prettyNum(c(onc_p,tsg_p),digits=1))
+m$label <- as.character(NA)
+m[first=='Yes',label:=plabs]
+
+##Keep same color pattern
+label_tmp<-round(nrow(dat[dat$Role %in% c('Oncogene','TSG')&dat$AICDA_present=="YES",])/nrow(dat[dat$Role %in% c('Oncogene','TSG'),])*100,2)
+
+#####
+##Now for the right plots
+
+###Prove AICDA occurs "later" after the first mutation on the more prevalent allele has been produced...
+##Prepare data, separate by Oncogene and TSGs
+
+
+####
+#######Add variable
+  
+f_dat_onco <- as.data.frame.matrix(xtabs(~more_common_allele + AICDA_mutation.1, data=dat[Role %in% c('Oncogene')&dat$AICDA_present=="YES",]))
+colnames(f_dat_onco)<-c("Other origin","AICDA")
+
+pval <- fisher.test(f_dat_onco)$p.value
+pval_label5 <- paste0('P~',round(pval,3))
+
+res2<-f_dat_onco
+res2 <- res2 / rowSums(res2)
+role_order <- c("Other origin","AICDA")
+res2 <- cbind(Role=role_order,res2)
+dat2 <- melt(res2,id.var='Role')
+dat2$Role <- factor(dat2$Role,levels=role_order)
+dat2$value <- 100*dat2$value
+ci_AI <- binom.confint(f_dat_onco$AICDA,(f_dat_onco$AICDA + f_dat_onco$`Other origin`),method='exact')
+ci_AI$Role <- res2$Role
+ci_AI$Role <- factor(ci_AI$Role, levels=c("Other origin","AICDA"))
+setnames(ci_AI,'mean','value')
+ci_AI$value <- 100*ci_AI$value
+ci_AI$lower <- 100*ci_AI$lower
+ci_AI$upper <- 100*ci_AI$upper
+ci_AI$Role <- factor(ci_AI$Role, levels=c("Other origin","AICDA"))
+dat2$Role<-factor(dat2$Role, levels=c("Other origin","AICDA"))
+
+f_dat_onco <- as.data.frame.matrix(xtabs(~more_common_allele + AICDA_mutation.1, data=dat[Role %in% c('TSG')&dat$AICDA_present=="YES",]))
+colnames(f_dat_onco)<-c("Other origin","AICDA")
+
+pval <- fisher.test(f_dat_onco)$p.value
+pval_label5 <- paste0('P~',round(pval,3))
+
+res2<-f_dat_onco
+res2 <- res2 / rowSums(res2)
+role_order <- c("Other origin","AICDA")
+res2 <- cbind(Role=role_order,res2)
+dat2 <- melt(res2,id.var='Role')
+dat2$Role <- factor(dat2$Role,levels=role_order)
+dat2$value <- 100*dat2$value
+ci_AI <- binom.confint(f_dat_onco$AICDA,(f_dat_onco$AICDA + f_dat_onco$`Other origin`),method='exact')
+ci_AI$Role <- res2$Role
+ci_AI$Role <- factor(ci_AI$Role, levels=c("Other origin","AICDA"))
+setnames(ci_AI,'mean','value')
+ci_AI$value <- 100*ci_AI$value
+ci_AI$lower <- 100*ci_AI$lower
+ci_AI$upper <- 100*ci_AI$upper
+ci_AI$Role <- factor(ci_AI$Role, levels=c("Other origin","AICDA"))
+dat2$Role<-factor(dat2$Role, levels=c("Other origin","AICDA"))
+
+##############################
+#######################
+##############Now graph at the residue level...enrichment for phased data..
+##Test for which residues are enriched for AICDA acting later than Other origin mutations...
+
+en_dat<-dat[Role %in% c('TSG',"Oncogene"),] ##Subset TSG and Oncogenes
+###Which residues are avaliable
+residues<-c(unique(en_dat$firstallele),unique(en_dat$secondallele))
+###Add tumor type data
+en_dat$metamaintype<-Composite_phased$metamaintype[match(en_dat$Tumor_Sample_Barcode,Composite_phased$Tumor_Sample_Barcode)]
+
+
+test_mutation_residue <- function(query_mutation,dd) {
+  dd<-subset(dd,dd$secondallele%in%)
+  query_gene <- strsplit(query_mutation,' ')[[1]][1]
+    ## function to test a mutation for enrichment in composite mutations
+  samples_residues_first_AICDA<-  unique(dd$Tumor_Sample_Barcode[dd$firstallele %in% query_mutation & dd$more_common_allele=="first"&dd$AICDA_mutation.1=="YES" ])
+  samples_residues_first_other<-  unique(dd$Tumor_Sample_Barcode[dd$firstallele %in% query_mutation & dd$more_common_allele=="first"&dd$AICDA_mutation.1=="NO" ])
+  
+  samples_residues_second_AICDA<-  unique(dd$Tumor_Sample_Barcode[dd$secondallele %in% query_mutation & dd$more_common_allele=="first"&dd$AICDA_mutation.2=="YES" ])
+  samples_residues_second_other<-  unique(dd$Tumor_Sample_Barcode[dd$secondallele %in% query_mutation & dd$more_common_allele=="first"&dd$AICDA_mutation.2=="NO" ])
+  ###Get if the tumor types in which it is present...
+  
+
+    n.samples_first_AICDA = length(unique(strsplit(samples_residues_first_AICDA,9)))
+    n.samples_first_other = length(unique(strsplit(samples_residues_first_other,9)))
+    n.samples_second_AICDA = length(unique(strsplit(samples_residues_second_AICDA,9)))
+    n.samples_second_other = length(unique(strsplit(samples_residues_second_other,9)))
+
+    m <- rbind(c(n.samples_second_AICDA,n.samples_second_other),
+               c(n.samples_first_AICDA,n.samples_first_other))
+p.second_AICDA<-n.samples_second_AICDA/sum(m)
+p.second_other<-n.samples_second_other/sum(m)
+             list(query_gene=query_gene,
+         query_mutation=query_mutation,
+         n.samples_first_AICDA=n.samples_first_AICDA,
+         n.samples_first_other=n.samples_first_other,
+         n.samples_second_AICDA=n.samples_second_AICDA,
+         n.samples_second_other=n.samples_second_other,
+         p.second_AICDA=p.second_AICDA)    
+}
+
+resi_pref_first <- lapply(FUN = test_mutation_residue, X = residues,dd=en_dat)
+
+
+resi_pref_first <- rbindlist(resi_pref_first)
+
+###Reorder...
+
+resi_pref_first <-resi_pref_first [order(resi_pref_first$n.samples_second_AICDA,decreasing = T),]
+
+###Test that PIK3CA E726 happening at second is due AICDA vs other
+binom.test(resi_pref_first$n.samples_second_AICDA[resi_pref_first$query_mutation=="PIK3CA E726"][1], sum(resi_pref_first[resi_pref_first$query_mutation=="PIK3CA E726",5:6][1]), p=0.5,alternative='two.sided')
+##p-value = 0.03906; this result is included in the description of the article...
+
+
+####Save data
+write.table(dat_timetable_compo,"/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/Phased_AICDA_subset_n339.txt",quote = F,sep = "\t")
+
+
+```
+
+
+
+```{r panel_Sup_17e, fig.width=16,fig.height=10}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+##Import data
+ci<-as.data.table(read.delim("Data/Figure5/FigureSup_17e_1A.tab"))
+m<-as.data.table(read.delim("Data/Figure5/FigureSup_17e_1B.tab"))
+
+# role_order<-c("Oncogene" ,"TSG")     
+
+m$first <- factor(m$first, levels=c('No','Yes'))
+ci$first <- factor(ci$first, levels=c('No','Yes'))
+
+cols <- c('#B7DBEA','#1B89AD')
+names(cols) <- levels(m$first)
+
+#dat2$variable <- factor(dat2$variable,levels=(c('Non-truncating/Non-truncating','1 or both are truncating')))
+
+
+##This is the left part of the plot...
+p2 <- ggplot(m, aes(x=role,y=mean)) +
+    geom_bar(stat='identity',aes(fill=first)) + 
+    geom_text(aes(label=label),y=20) + 
+    geom_errorbar(data=ci, aes(min=`mean`,max=upper),color='black',width=0) +
+    geom_errorbar(data=ci, aes(min=lower,max=`mean`),color='white',width=0) +
+    geom_hline(yintercept=50,color='red',size=0.5,linetype='dashed') +
+    scale_fill_manual(values=c( "darkred","#F8766D"), name='More prevalent\nallele mutated\nfirst:') +
+    theme_std(base_size=14) +
+    scale_y_continuous(expand=c(0,0),position='right') + 
+    labs(x=NULL,y='% timeable AICDA composite mutations') + 
+    theme(strip.background=element_blank()) +
+    coord_flip()+theme(legend.position='bottom')
+########
+##Now the right size of the plot (two plots)
+
+ci_AI<-as.data.table(read.delim("Data/Figure5/FigureSup_17e_2A.tab"))
+dat2<-as.data.table(read.delim("Data/Figure5/FigureSup_17e_2B.tab"))
+
+
+ci_AI$Role <- factor(ci_AI$Role, levels=c("Other origin","AICDA"))
+dat2$Role<-factor(dat2$Role, levels=c("Other origin","AICDA"))
+dat2$variable<-factor(dat2$variable, levels=c("Other origin","AICDA"))
+pval_label5<-"P~1"
+
+p3 <- ggplot(dat2, aes(x=Role,y=value)) +
+    geom_bar(stat='identity',aes(fill=variable)) +
+    geom_signif(comparisons=list(c("Other origin","AICDA")), y_position =105, tip_length = 0, annotations=pval_label5)+scale_fill_manual(values=c( "darkred","#F8766D"),name = "Composite mutation type", labels = c("Other origin", "AICDA induced"))+   geom_errorbar(data=ci_AI,aes(min=lower,max=value),color='white',width=0) +
+    geom_errorbar(data=ci_AI,aes(min=value,max=upper),color='black',width=0) +
+    scale_y_continuous(expand=c(0,0),limits=c(0,115),breaks=seq(0,100,by=25),position='right') +
+    labs(x=NULL,y='% of timetable Oncogene composite mutants') +
+    theme_std(base_size=14) +
+    theme(legend.position='none') + #axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    coord_flip()
+
+####Now for TSGs
+
+ci_AI<-as.data.table(read.delim("Data/Figure5/FigureSup_17e_3A.tab"))
+dat2<-as.data.table(read.delim("Data/Figure5/FigureSup_17e_3B.tab"))
+
+
+ci_AI$Role <- factor(ci_AI$Role, levels=c("Other origin","AICDA"))
+dat2$Role<-factor(dat2$Role, levels=c("Other origin","AICDA"))
+dat2$variable<-factor(dat2$variable, levels=c("Other origin","AICDA"))
+pval_label5<-"P~0.46"
+
+p4 <- ggplot(dat2, aes(x=Role,y=value)) +
+    geom_bar(stat='identity',aes(fill=variable)) +
+    geom_signif(comparisons=list(c("Other origin","AICDA")), y_position =105, tip_length = 0, annotations=pval_label5)+scale_fill_manual(values=c( "darkred","#F8766D"),name = "Composite mutation type", labels = c("Other origin", "AICDA induced"))+   geom_errorbar(data=ci_AI,aes(min=lower,max=value),color='white',width=0) +
+    geom_errorbar(data=ci_AI,aes(min=value,max=upper),color='black',width=0) +
+    scale_y_continuous(expand=c(0,0),limits=c(0,115),breaks=seq(0,100,by=25),position='right') +
+    labs(x=NULL,y='% of timetable TSGs composite mutants') +
+    theme_std(base_size=14) +
+    theme(legend.position='none') + #axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+    coord_flip()
+
+##Merge inside the other
+##Grab
+# called a "grop" in Grid terminology
+xbp_grob <- ggplotGrob(p3+theme(title=element_text(size=11)))
+xbp_grob2 <- ggplotGrob(p4+theme(title=element_text(size=11)))
+
+label_tmp<-16.31 #From analysis
+  
+p_compo_timeable_AICDA<-p2+theme(plot.margin = unit(c(0,35,0,0), "lines"))+labs(x=NULL,y=paste0('% timeable AICDA composite mutations \n(',label_tmp,"% of timeable composite mutations)" ))+annotation_custom(grob = xbp_grob, xmin = 0.75, xmax = 1.25, ymin = 105.5, ymax = 153.7)+annotation_custom(grob = xbp_grob2, xmin = 1.75, xmax = 2.25, ymin = 105.5, ymax = 153.7)
+
+###Add lines with grid at the end
+
+p_compo_timeable_AICDA
+
+```
+
+
+***
+
+\pagebreak
+
+# Fig 5b
+
+```{r  panel5b_cals,echo=T,eval=F,fig.show="hide"}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#####Figure 4G, Residue enrichment....
+
+##Calculate residue enrichment
+## load/format mutation data, need to run prevous sections..
+d_mutations<-Composite_maf_muts[,c('Tumor_Sample_Barcode','exclude','Hugo_Symbol','Role','putative_resistance_mutation',
+                                   'Variant_Classification','Variant_Type','tcn', 'mutationid', 'high_tmb','hotspot_class',
+                                   'tm','hotspotid','HGVSp_Short','truncating','Reference_Allele','Tumor_Seq_Allele2',
+                                   'Start_Position','End_Position',"AICDA_mutation")]
+
+d_mutations<-as.data.table(d_mutations)#Transform to data.table
+## load gene annotations including covariates
+gene_info <- fread(('Data/Figure5/Raw_calculations/gene_info.txt'),
+                   select=c('Hugo_Symbol','Role','panel_introduced','reptime',
+                            'percentage_gene_gc_content','cds_length','hic'))
+
+d <- d_mutations[exclude==F & putative_resistance_mutation==F]
+d[hotspotid!='',tm:=hotspotid] ## in cases of INDEL hotspots, group mutation IDs together into the hotspot cluster
+d[Variant_Classification=='TERT promoter', tm:=paste('TERT',gsub('p[.]','',HGVSp_Short))]
+d <- d[,c('Tumor_Sample_Barcode','Hugo_Symbol','tm','putative_resistance_mutation','mutationid','exclude','truncating','hotspotid','Variant_Classification','Start_Position',"AICDA_mutation"),with=F]
+
+
+## load/format phasing data for annotation the results
+d_phased <- Composite_phased
+d_phased <- d_phased[exclude==F & putative_resistance_mutation.1==F & putative_resistance_mutation.2==F]
+d_phased$id <- paste(d_phased$mutationid.1,d_phased$mutationid.2,sep=' + ')
+d_phased <- d_phased[!duplicated(id),]
+phased <- d_phased
+phased[hotspotid.1!='',tm.1:=hotspotid.1]
+phased[hotspotid.2!='',tm.2:=hotspotid.2]
+phased[Variant_Classification.1=='TERT promoter', tm.1:=paste('TERT',gsub('p[.]','',HGVSp_Short.1))]
+phased[Variant_Classification.2=='TERT promoter', tm.2:=paste('TERT',gsub('p[.]','',HGVSp_Short.2))]
+phased <- phased[,c('mutationid.1','mutationid.2','phase'),with=F]
+phased <- melt(phased,id.var='phase')
+phased[,variable:=NULL]
+setnames(phased,'value','mutationid')
+
+
+
+## here we annotate the rate of cis/trans composites with each mutation in the table
+## annotate phase of all mutations (NB: a single mutation in a sample with 
+## 3+ mutations in composite can have multiple phases)
+annotate_phases_of_variant <- function(query.mutationid,phased) {
+    phased <- phased[mutationid==query.mutationid,]
+    if(nrow(phased) > 0) {
+        cis <- any(phased$phase=='cis',na.rm=T)
+        trans <- any(phased$phase=='trans',na.rm=T)
+        trans_or_separate_cells <- any(phased$phase=='trans_or_separate_cells',na.rm=T)
+        ambiguous <- any(phased$phase=='ambiguous: 3+ cis, 3+ trans',na.rm=T)
+        unknown <- any(phased$phase=='unknown',na.rm=T)
+        not_phased <- F
+    } else {
+        cis <- F
+        trans <- F
+        trans_or_separate_cells <- F
+        ambiguous <- F
+        unknown <- F
+        not_phased <- T
+    }
+    list(mutationid=query.mutationid, cis=cis, trans=trans, trans_or_separate_cells=trans_or_separate_cells, ambiguous=ambiguous, unknown=unknown, not_phased=not_phased)
+}
+
+message('Annotating phase info for mutations ...')
+l <- mclapply(d$mutationid, annotate_phases_of_variant, phased, mc.cores=cpus)
+ll <- rbindlist(l)
+d <- merge(d, ll, by='mutationid', all.x=T)
+d$tsbgene <- paste(d$Tumor_Sample_Barcode,d$Hugo_Symbol)
+
+## annotate composites (including the phased and not-phased)
+tbl <- table.freq(d$tsbgene)
+d <- merge(d, tbl, by.x='tsbgene', by.y='value', all.x=T)
+d$composite <- d$N > 1
+d[,N:=NULL]
+
+## annotate non-composites as NA for not phased
+d[composite==F,not_phased:=NA]
+d <- d[order(Hugo_Symbol, Start_Position),]
+
+
+
+
+get_composite_rate_per_gene2 <- function(d,AICDA=TRUE) {
+    
+    ## get sample barcodes for singletons/composites/overall
+    tbl <- table.freq(d$Tumor_Sample_Barcode)
+    samples <- tbl$value[tbl$N > 0]
+    if (AICDA==TRUE) {
+        ###For AICDA condition
+        tbl$composite <- tbl$N > 1
+        tbl[,N:=NULL]
+        d <- merge(d, tbl, by.x='Tumor_Sample_Barcode', by.y='value', all.x=T)
+        tbl <- table.freq(d$Tumor_Sample_Barcode)
+        singleton_samples <- tbl$value[tbl$N == 1] #Total singletons
+        #For AICDA, Subset to AICDA
+        
+        composite_samples <- d$Tumor_Sample_Barcode[d$AICDA_mutation=="YES"&d$composite=="TRUE"] #COmposites with AICDA mutation
+        
+        
+    }
+    if (AICDA==FALSE){
+        composite_samples <- tbl$value[tbl$N > 1]
+        singleton_samples <- tbl$value[tbl$N == 1]
+    }
+    
+    ## don't overcount multiple samples per patient
+    samples <- length(unique(strtrim(samples, 9)))
+    composites <- length(unique(strtrim(composite_samples, 9)))
+    singletons <- length(unique(strtrim(singleton_samples, 9)))
+    
+    ## calculate the average TCN to include as covariate for this gene
+    tcn <- mean(d$tcn,na.rm=T) 
+    list(
+        singletons=singletons,composites=composites,samples=samples,
+        tcn=tcn,reptime=unique(d$reptime),percentage_gene_gc_content=unique(d$percentage_gene_gc_content),cds_length=unique(d$cds_length),
+        hic=unique(d$hic),
+        panel_introduced=unique(d$panel_introduced))
+} #Redefine function..
+#res <- d[,get_composite_rate_per_gene(.SD),by=Hugo_Symbol]
+
+test_mutation2 <- function(query_mutation,dd,AICDA=TRUE) {
+    ## function to test a mutation for enrichment in composite mutations
+    
+    message(query_mutation)
+    query_gene <- strsplit(query_mutation,' ')[[1]][1]
+    prop_resistance <- mean(dd$putative_resistance_mutation[dd$tm %in% query_mutation],na.rm=T)
+    prop_truncating <- mean(dd$truncating[dd$tm %in% query_mutation],na.rm=T)
+    hotspot_class <- paste(sortunique(dd$hotspot_class[dd$tm %in% query_mutation]),collapse=',')
+    oncogenic <- paste(sortunique(dd$oncogenic[dd$tm %in% query_mutation]),collapse=',')
+if (AICDA==TRUE) {
+    
+    #For AICDA, Subset to AICDA
+  samples_with_composite_mutation_in_gene <- sortunique(dd$Tumor_Sample_Barcode[dd$Hugo_Symbol %in% query_gene & dd$composite==T&dd$AICDA_mutation=="YES"])
+    samples_with_composite_mutation_including_residue <- sortunique(dd$Tumor_Sample_Barcode[dd$tm %in% query_mutation & dd$composite==T&dd$AICDA_mutation=="YES"])
+    samples_with_composite_mutation_not_including_residue <- samples_with_composite_mutation_in_gene[samples_with_composite_mutation_in_gene %nin% samples_with_composite_mutation_including_residue] 
+    #COmposites with AICDA mutation
+}
+    if (AICDA==FALSE){
+     samples_with_composite_mutation_in_gene <- sortunique(dd$Tumor_Sample_Barcode[dd$Hugo_Symbol %in% query_gene & dd$composite==T])
+    samples_with_composite_mutation_including_residue <- sortunique(dd$Tumor_Sample_Barcode[dd$tm %in% query_mutation & dd$composite==T])
+    samples_with_composite_mutation_not_including_residue <- samples_with_composite_mutation_in_gene[samples_with_composite_mutation_in_gene %nin% samples_with_composite_mutation_including_residue] 
+
+}
+       samples_with_singleton_mutation_in_gene <- sortunique(dd$Tumor_Sample_Barcode[dd$Hugo_Symbol %in% query_gene & dd$composite==F])
+    samples_with_singleton_mutation_including_residue <- sortunique(dd$Tumor_Sample_Barcode[dd$tm %in% query_mutation & dd$composite==F])
+    samples_with_singleton_mutation_not_including_residue <- samples_with_singleton_mutation_in_gene[samples_with_singleton_mutation_in_gene %nin% samples_with_singleton_mutation_including_residue] 
+
+    n.samples_with_singleton_mutation_including_residue = length(unique(strsplit(as.character(samples_with_singleton_mutation_including_residue),9)))
+    n.samples_with_singleton_mutation_not_including_residue = length(unique(strsplit(as.character(samples_with_singleton_mutation_not_including_residue),9)))
+    n.samples_with_composite_mutation_including_residue = length(unique(strsplit(as.character(samples_with_composite_mutation_including_residue),9)))
+    n.samples_with_composite_mutation_not_including_residue = length(unique(strsplit(as.character(samples_with_composite_mutation_not_including_residue),9)))
+####Added as.character no avoid a bug
+    
+    m <- rbind(c(n.samples_with_singleton_mutation_not_including_residue,n.samples_with_singleton_mutation_including_residue),
+               c(n.samples_with_composite_mutation_not_including_residue,n.samples_with_composite_mutation_including_residue))
+
+    ## two-sided p-values for text
+    tst <- fisher.test(m,alternative='two.sided')
+    p.value.two.sided <- tst$p.value
+    OR <- tst$estimate
+    
+    ## enrichment p-value for plot
+    tst <- fisher.test(m,alternative='greater')
+    p.value.enriched <- tst$p.value
+
+    cis_samples <- dd$Tumor_Sample_Barcode[dd$cis==T & dd$tm %in% query_mutation]
+    trans_samples <- dd$Tumor_Sample_Barcode[dd$trans==T & dd$tm %in% query_mutation]
+    trans_or_separate_cells_samples <- dd$Tumor_Sample_Barcode[dd$trans_or_separate_cell==T & dd$tm %in% query_mutation]
+    ambiguous_samples <- dd$Tumor_Sample_Barcode[dd$ambiguous==T & dd$tm %in% query_mutation]
+    unknown_samples <- dd$Tumor_Sample_Barcode[dd$unknown==T & dd$tm %in% query_mutation]
+    not_phased_samples <- dd$Tumor_Sample_Barcode[dd$not_phased==T & !is.na(dd$not_phased) & dd$tm %in% query_mutation]
+
+    n_cis <- 0; n_trans <- 0; n_ambiguous <- 0; n_trans_or_separate_cells <- 0; n_unknown <- 0; n_not_phased <- 0
+    if(length(cis_samples)>0) n_cis <- length(unique(strtrim(cis_samples,9)))
+    if(length(trans_samples)>0) n_trans <- length(unique(strtrim(trans_samples,9)))
+    if(length(ambiguous_samples)>0) n_ambiguous <- length(unique(strtrim(ambiguous_samples,9)))
+    if(length(trans_or_separate_cells_samples)>0) n_trans_or_separate_cells <- length(unique(strtrim(trans_or_separate_cells_samples,9)))
+    if(length(unknown_samples)>0) n_unknown <- length(unique(strtrim(unknown_samples,9)))
+    if(length(not_phased_samples)>0) n_not_phased <- length(unique(strtrim(not_phased_samples,9)))
+
+    list(query_gene=query_gene,
+         query_mutation=query_mutation,
+         n.samples_with_singleton_mutation_including_residue=n.samples_with_singleton_mutation_including_residue,
+         n.samples_with_singleton_mutation_not_including_residue=n.samples_with_singleton_mutation_not_including_residue,
+         n.samples_with_composite_mutation_including_residue=n.samples_with_composite_mutation_including_residue,
+         n.samples_with_composite_mutation_not_including_residue=n.samples_with_composite_mutation_not_including_residue,
+         OR=OR,
+         p.value.two.sided=p.value.two.sided,
+         p.value.enriched=p.value.enriched,
+         prop_resistance=prop_resistance,
+         prop_truncating=prop_truncating,
+         hotspot_class=hotspot_class,
+         oncogenic=oncogenic,
+         n_cis=n_cis, n_trans=n_trans, n_ambiguous=n_ambiguous, n_trans_or_separate_cells=n_trans_or_separate_cells, 
+         n_unknown=n_unknown, n_not_phased=n_not_phased)    
+} ##Redefine function for AICDA
+
+
+
+
+## test SNP residues and in-frame INDELS mutated in 5+ patients
+message('Testing residues, in-frame indels and TERT promoter alleles mutated in 5+ patients for enrichment ...')
+tmp <- d[,c('tm','Tumor_Sample_Barcode'),with=F]
+tmp$pid <- strtrim(tmp$Tumor_Sample_Barcode,9)
+summarize_tm <- function(d) {
+    n_pts <- length(unique(d$pid))
+    list(n_pts=n_pts)
+}
+info <- tmp[,summarize_tm(.SD),by=tm]
+test_mutations <- info$tm[info$n_pts >= 5]
+l <- mclapply(test_mutations, test_mutation2, d, mc.cores=cpus)
+
+ll <- rbindlist(l)
+ll <- ll[order(p.value.enriched,decreasing=F),]
+ll$q.value.enriched <- p.adjust(ll$p.value.enriched,method='BH')
+ll$q.value.two.sided <- p.adjust(ll$p.value.two.sided,method='BH')
+ll <- merge(ll, d[!duplicated(tm),c('tm','hotspotid'),with=F], by.x='query_mutation', by.y='tm', all.x=T)
+ll <- ll[order(q.value.enriched,decreasing=F),]
+
+## save result
+write.table(ll,file = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/REsidue_enrichment_AICDA.tab",quote = F,sep = "\t")
+
+residue_enrichment<-ll
+
+
+```
+
+
+
+```{r panel_5b, fig.width=18,fig.height=14}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+###Import data...
+cols <- c('#EF7B64','#1A89AD','#70C1DF','#BFBFBE')
+names(cols) <- c('Gene + Residue','Gene','Residue','Not significant')
+
+## load data for gene and residue enrichment for composite mutations
+gene_enrichment <- fread(('Data/Figure5/Raw_calculations/gene_enrichment_AICDAmuts.txt'))
+residue_enrichment <- fread(('Data/Figure5/Raw_calculations/REsidue_enrichment_AICDA.tab'))
+
+## merge in gene enrichment data and plot
+gene_enrichment <- gene_enrichment[,c('Hugo_Symbol','q_enriched'),with=F]
+setnames(gene_enrichment,'Hugo_Symbol','query_gene')
+residue_enrichment <- residue_enrichment[,c('query_gene','query_mutation','q.value.enriched'),with=F]
+setnames(residue_enrichment,'q.value.enriched','q.value')
+dat <- merge(residue_enrichment,gene_enrichment,by='query_gene',all.x=T)
+names(dat) <- c('gene','residue','q.residue','q.gene')
+dat$nlog10q.gene <- -log10(dat$q.gene)
+dat$nlog10q.residue <- -log10(dat$q.residue)
+
+## additional formatting for plot
+gene_labs <- dat[q.gene < 0.01,c('gene','q.gene'),with=F]
+gene_labs <- gene_labs[!duplicated(gene),]
+gene_labs$nlog10q.gene <- -log10(gene_labs$q.gene)
+gene_labs$sig <- 'Not significant'
+gene_labs[q.gene < 0.01,sig:='Gene']
+gene_labs$sig <- factor(gene_labs$sig,levels=names(cols))
+residue_labs <- dat[(q.residue < 0.01 & q.gene < 0.01) | (q.residue < 1e-3 & q.gene >= 0.01) ,c('gene','residue','q.gene','q.residue'),with=F]
+residue_labs <- residue_labs[!duplicated(residue),]
+residue_labs$nlog10q.gene <- -log10(residue_labs$q.gene)
+residue_labs$nlog10q.residue <- -log10(residue_labs$q.residue)
+residue_labs <- residue_labs[order(gene,q.residue,decreasing=F),]
+
+topN_per_gene <- function(d,n) {
+    d <- d[order(q.residue,decreasing=F),]
+    d[1:n,]
+}
+
+top3_genes <- c('APC','PIK3CA','TP53','EGFR')
+residue_labs3 <- residue_labs[gene %in% top3_genes,topN_per_gene(.SD,3),by=gene]
+top1_genes <- c('PTEN','MAP3K1','FBXW7','TERT','BRAF','ERBB2','FGFR2')
+residue_labs1 <- residue_labs[gene %in% top1_genes,topN_per_gene(.SD,1),by=gene]
+residue_labs_other <- residue_labs[gene %nin% c(top3_genes,top1_genes),topN_per_gene(.SD,1),by=gene]
+residue_labs_other$residue <- NA
+residue_labs <- rbind(residue_labs3, residue_labs1, residue_labs_other)
+
+residue_labs <- residue_labs[!is.na(q.residue)]
+residue_labs$sig <- 'Not significant'
+residue_labs[q.residue < 0.01 & q.gene < 0.01,sig:='Gene + Residue']
+residue_labs[q.residue >= 0.01 & q.gene < 0.01,sig:='Gene']
+residue_labs[q.residue < 0.01 & q.gene >= 0.01,sig:='Residue']
+residue_labs$sig <- factor(residue_labs$sig,levels=names(cols))
+
+sig_val <- -log10(0.01)
+dat$sig <- 'Not significant'
+dat[q.residue < 0.01 & q.gene < 0.01,sig:='Gene + Residue']
+dat[q.residue >= 0.01 & q.gene < 0.01,sig:='Gene']
+dat[q.residue < 0.01 & q.gene >= 0.01,sig:='Residue']
+dat$sig <- factor(dat$sig,levels=names(cols))
+
+dat[is.infinite(nlog10q.gene),nlog10q.gene:=200]
+dat <- dat[!is.na(q.gene),]
+gene_labs[is.infinite(nlog10q.gene),nlog10q.gene:=200]
+gene_labs <- gene_labs[!is.na(q.gene),]
+#plot_gene_labels <- c('NF1','CDKN1A','CIC','CDK12','PIK3R1') #
+gene_labs$label <- gene_labs$gene
+gene_labs[gene %in% residue_labs$gene[residue_labs$sig%in%"Gene + Residue"],label:=NA]#Take out the ones that are enriched for both gene and residue
+
+residue_labs[is.infinite(nlog10q.gene),nlog10q.gene:=200]
+residue_labs <- residue_labs[!is.na(q.gene),]
+
+## broken x-axis
+x_info <- break_axis(dat$nlog10q.gene,maxlower=30,minupper=50,lowerticksize=5,upperticksize=50,ratio_lower_to_upper=0.45)
+dat$nlog10q.gene.new <- x_info$newy
+x_info_gene_labs <- break_axis(gene_labs$nlog10q.gene,maxlower=30,minupper=50,lowerticksize=5,upperticksize=50,ratio_lower_to_upper=0.45)
+gene_labs$nlog10q.gene.new <- x_info_gene_labs$newy
+x_info_residue_labs <- break_axis(residue_labs$nlog10q.gene,maxlower=30,minupper=50,lowerticksize=5,upperticksize=50,ratio_lower_to_upper=0.45)
+residue_labs$nlog10q.gene.new <- x_info_residue_labs$newy
+
+## broken y-axis
+y_info <- break_axis(dat$nlog10q.residue,maxlower=10,lowerticksize=2,upperticksize=5,ratio_lower_to_upper=0.25)
+dat$nlog10q.residue.new <- y_info$newy
+y_info_residue_labs <- break_axis(residue_labs$nlog10q.residue,maxlower=10,lowerticksize=2,upperticksize=5,ratio_lower_to_upper=0.25)
+residue_labs$nlog10q.residue.new <- y_info_residue_labs$newy
+
+## make plot
+Residue_enrichmente_p_aicda <- ggplot(dat,aes(x=nlog10q.gene.new,y=nlog10q.residue.new)) +
+    geom_hline(yintercept=sig_val,color='grey',size=0.5,linetype='dashed') +
+    geom_vline(xintercept=sig_val,color='grey',size=0.5,linetype='dashed') +
+    geom_point(aes(color=sig),size=1.2) +
+    geom_text_repel(data=residue_labs,aes(x=nlog10q.gene.new,y=nlog10q.residue.new,label=residue,color=sig),
+                    min.segment.length=0.001,angle=0,hjust=0,vjust=0.5) +
+    geom_text_repel(data=gene_labs,aes(x=nlog10q.gene.new,label=label,color=sig),y=0,angle=90,hjust=1.2,vjust=0.5) +
+    scale_x_continuous(limits=x_info$limits,labels=x_info$labels,breaks=x_info$breaks) +
+    scale_y_continuous(limits=c(-0.5,y_info$limits[2]),labels=y_info$labels,breaks=y_info$breaks) +
+    scale_color_manual(values=cols,name='Leve of enrichment\n(composites):') +
+    theme_classic(base_family='ArialMT',base_size=14) +
+    theme(legend.position='bottom') +
+    labs(x='Gene -log10(q-value)',y='Residue -log10(q-value)')
+
+
+Residue_enrichmente_p_aicda
+```
+
+
+***
+
+\pagebreak
+
+
+# Fig 5c
+
+```{r  panel5c_cals,echo=T,eval=F,fig.show="hide"}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#####Figure 4
+#d_mutations is obtained running previous scripts (is the composite maf after tagging the AICDA mutations)
+d <- d_mutations  #This already includes the AICDA tag
+d <- d[exclude==F & putative_resistance_mutation==F,]
+dd <- d[Variant_Classification %in% 'Missense_Mutation',]
+dd[hotspot_class=='3d',hotspot:=F]
+dd[hotspot_class=='3d',hotspot_class:='']
+
+### annotate if the sample-gene is singleton or composite
+dd$id <- paste(dd$Tumor_Sample_Barcode,dd$Hugo_Symbol)
+tbl <- table.freq(dd$id)
+singleton <- tbl$value[tbl$N==1]
+composite <- tbl$value[tbl$N>1]
+dd$composite <- dd$id %in% composite #Say if it is composite or not...
+dd$PATIENT_ID <- strtrim(dd$Tumor_Sample_Barcode,9)
+dd$pid_gene <- paste(dd$PATIENT_ID,dd$Hugo_Symbol)
+total_number_mutations <- length(unique(dd$pid_gene))
+total_number_singleton_mutations <- length(unique(dd$pid_gene[dd$composite==F]))
+total_number_composite_mutations <- length(unique(dd$pid_gene[dd$composite==T]))
+total_number_singleton_mutations_AID <- length(unique(dd$pid_gene[dd$composite==F & dd$AICDA_mutation=="YES"]))##Singleton AICDA
+total_number_composite_mutations_AID <- length(unique(dd$pid_gene[dd$composite==T & dd$AICDA_mutation=="YES"]))##COmposite AICDA
+
+
+### for each hotspot, count the number of mutant, singleton and composite samples
+summarize_individual_hotspot <- function(d) {
+    ### count affected singleton/composite samples
+    mutant_samples <- sortunique(d$Tumor_Sample_Barcode)
+    singleton_samples <- sortunique(d$Tumor_Sample_Barcode[d$composite==F])
+    composite_samples <- sortunique(d$Tumor_Sample_Barcode[d$composite==T])
+
+    ### don't overcount patients with 2+ samples
+    mutant_samples <- unique(strtrim(mutant_samples,9))
+    singleton_samples <- unique(strtrim(singleton_samples,9))
+    composite_samples <- unique(strtrim(composite_samples,9))
+
+    n.mutant <- length(mutant_samples)
+    n.singletons <- length(singleton_samples)
+    n.composites <- length(composite_samples)
+    list(n.mutant=n.mutant,n.singletons=n.singletons,n.composites=n.composites)
+}
+
+
+###########Now calculate for AICDA and globlal
+####
+summarize_individual_hotspot2 <- function(d,AICDA=TRUE) {
+    ### count affected singleton/composite samples
+    mutant_samples <- sortunique(d$Tumor_Sample_Barcode)
+    singleton_samples <- sortunique(d$Tumor_Sample_Barcode[d$composite==F])
+    composite_samples <- sortunique(d$Tumor_Sample_Barcode[d$composite==T])
+   
+    ### don't overcount patients with 2+ samples
+    mutant_samples <- unique(strtrim(mutant_samples,9))
+    singleton_samples <- unique(strtrim(singleton_samples,9))
+    composite_samples <- unique(strtrim(composite_samples,9))
+
+    n.mutant <- length(mutant_samples)
+    n.singletons <- length(singleton_samples)
+    n.composites <- length(composite_samples)
+    n.singletons_AID <- NA
+    n.composites_AID <- NA
+     if (AICDA==TRUE) {
+      singleton_samples_AID <- sortunique(d$Tumor_Sample_Barcode[d$composite==F & d$AICDA_mutation=="YES"])
+    composite_samples_AID <- sortunique(d$Tumor_Sample_Barcode[d$composite==T & d$AICDA_mutation=="YES"])
+    singleton_samples_AID <- unique(strtrim(singleton_samples_AID,9))
+    composite_samples_AID <- unique(strtrim(composite_samples_AID,9))
+    n.singletons_AID <- length(singleton_samples_AID)
+    n.composites_AID <- length(composite_samples_AID)
+   
+     }
+     list(n.mutant=n.mutant,n.singletons=n.singletons,n.composites=n.composites,n.singletons_AID=n.singletons_AID,n.composites_AID=n.composites_AID)
+} #Redefine function for AICDA calculation...
+
+###This is for AICDA hotspots and global at the same time!!!
+hotspots <- sortunique(dd$hotspotid)
+hotspots <- hotspots[hotspots!='']
+
+ll <- dd[hotspotid!='',summarize_individual_hotspot2(.SD),by=hotspotid]
+ll <- ll[order(n.mutant,decreasing=T),]
+ll$x.order <- 1:nrow(ll)
+ #Modify to have the other origin singletons..
+ll$n.singletons_all<-ll$n.singletons;ll$n.singletons<-ll$n.singletons-ll$n.singletons_AID
+ll$n.composites_all<-ll$n.composites;ll$n.composites<-ll$n.composites-ll$n.composites_AID
+
+ll$p.singletons <- cumsum(ll$n.singletons / total_number_singleton_mutations)
+ll$p.composites <- cumsum(ll$n.composites / total_number_composite_mutations)
+ll$p.mutant <- cumsum(ll$n.mutant / total_number_mutations)
+#AICDA
+ll$p.singletons_AID <- cumsum(ll$n.singletons_AID / total_number_singleton_mutations)
+ll$p.composites_AID <- cumsum(ll$n.composites_AID / total_number_composite_mutations)
+
+setnames(ll,'hotspotid','hotspot')
+
+overall_prob_composite_mutation_has_hotspot <- max(ll$p.composites)
+overall_prob_singleton_mutation_has_hotspot <- max(ll$p.singletons)
+#AICDA
+overall_prob_composite_mutation_has_hotspot_AID <- max(ll$p.composites_AID)
+overall_prob_singleton_mutation_has_hotspot_AID <- max(ll$p.singletons_AID)
+
+
+###################
+#############
+
+## get data for inset plot
+d <- d_mutations
+d <- d[exclude==F & putative_resistance_mutation==F,]
+dd <- d[Variant_Classification %in% 'Missense_Mutation',]
+dd[hotspot_class=='3d',hotspot:=F]
+dd[hotspot_class=='3d',hotspot_class:='']
+
+## annotate if the sample-gene is singleton or composite
+dd$id <- paste(dd$Tumor_Sample_Barcode,dd$Hugo_Symbol)
+tbl <- table.freq(dd$id)
+singleton <- tbl$value[tbl$N==1]
+composite <- tbl$value[tbl$N>1]
+dd$composite <- dd$id %in% composite
+
+## get number of singletons and composites, and same for those with hotspots
+composites <- dd[composite==T,]
+singletons <- dd[composite==F,]
+tbl_composite <- table(composites$hotspotid!='')
+tbl_singleton <- table(singletons$hotspotid!='')
+x <- c(tbl_composite[['TRUE']], tbl_singleton[['TRUE']]) ###FOr hotspots composites and singletons (all together)
+n <- c(nrow(composites),nrow(singletons)) ###Total composites or singletons
+
+composites <- dd[composite==T & AICDA_mutation=="YES",]
+singletons <- dd[composite==F & AICDA_mutation=="YES",]
+tbl_composite <- table(composites$hotspotid!='')
+tbl_singleton <- table(singletons$hotspotid!='')
+x_AID<-c(tbl_composite[['TRUE']], tbl_singleton[['TRUE']]) ###FOr hotspots composites and singletons AICDA
+
+###Take out AICDA to get the 'other signature'
+x<-x-x_AID
+
+
+## prep data for plot
+ci <- adt(binom.confint(x,n,method='exact'))
+ci$mutation <- c('Composite_other','Singleton_other')
+ci$mutation <- factor(ci$mutation, levels=rev(c('Singleton_other','Composite_other')))
+ci$mean <- 100*ci$mean
+ci$lower <- 100*ci$lower
+ci$upper <- 100*ci$upper
+pval <- prop.test(x,n,alternative='two.sided')$p.value
+pval_lab <- paste0('P=',prettyNum(pval,digits=1))
+ci2<-ci
+
+###For AICDA
+ci <- adt(binom.confint(x_AID,n,method='exact'))
+ci$mutation <- c('Composite_AID','Singleton_AID')
+ci$mutation <- factor(ci$mutation, levels=rev(c('Singleton_AID','Composite_AID')))
+ci$mean <- 100*ci$mean
+ci$lower <- 100*ci$lower
+ci$upper <- 100*ci$upper
+pval <- prop.test(x_AID,n,alternative='two.sided')$p.value
+pval2_lab <- paste0('P=',prettyNum(pval,digits=1))
+
+##Merge
+ci<-rbind(ci,ci2)
+ci$type<-c("Composite","Singleton","Composite","Singleton")
+ ci$mutation <- factor(ci$mutation,levels = c("Singleton_other","Composite_other","Singleton_AID","Composite_AID"))
+##Data for Remaining (NO AICDA mutations)
+
+ ###Adapt for plotting
+ ci$lower[3:4]<-ci$lower[3:4]+ci$mean[1:2]
+ci$upper[3:4]<-ci$upper[3:4]+ci$mean[1:2]
+ci$mean_plot<-c(ci$mean[1:2],ci$mean[3:4]+ci$mean[1:2])
+
+
+
+```
+
+
+
+```{r panel_5c, fig.width=20,fig.height=10}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+###Import needed already analyzed data..
+ll<-as.data.table(read.delim("Data/Figure5/Figure5c.tab"))
+
+total_number_singleton_mutations<-93616
+total_number_composite_mutations<-2920
+
+### Calculate P-value:
+singletons_summary <- data.table(x=sum(ll$n.singletons),n=total_number_singleton_mutations,class='Singletons')
+composites_summary <- data.table(x=sum(ll$n.composites),n=total_number_composite_mutations,class='Composite mutations')
+summary <- rbind(singletons_summary, composites_summary)
+pval <- prop.test(summary$x, summary$n)$p.value
+pval_lab <- paste0('P~',prettyNum(pval,digits=1))
+##Now for AICDA
+singletons_summary <- data.table(x=sum(ll$n.singletons_AID),n=total_number_singleton_mutations,class='Singletons')
+composites_summary <- data.table(x=sum(ll$n.composites_AID),n=total_number_composite_mutations,class='Composite mutations')
+summary <- rbind(singletons_summary, composites_summary)
+pval <- prop.test(summary$x, summary$n)$p.value
+pval_lab2 <- paste0('P~',prettyNum(pval,digits=1))
+
+
+## prep data for plot
+toadd <- data.table(hotspot='none',n.mutant=NA,n.singletons=NA,n.composites=NA,n.singletons_AID=NA,n.composites_AID=NA,x.order=0,n.singletons_all=NA, n.composites_all=NA,p.singletons=0,p.composites=0,p.mutant=0,p.singletons_AID=0,p.composites_AID=0)
+pdat <- rbind(toadd,ll)
+pdat <- melt(pdat[,c('hotspot','x.order','p.singletons','p.composites',"p.singletons_AID","p.composites_AID"),with=F],id.var=c('x.order','hotspot'))
+pdat$Class <- ''
+pdat[variable=='p.singletons',Class:='Singleton_other']
+pdat[variable=='p.composites',Class:='Composite_other']
+pdat[variable=='p.singletons_AID',Class:='Singleton_AID']
+pdat[variable=='p.composites_AID',Class:='Composite_AID']
+
+pdat$Class <- factor(pdat$Class,levels=c('Singleton_other','Composite_other',"Singleton_AID","Composite_AID"))
+
+cols <- c('#979797','#1B89AD',"black","darkred")
+names(cols) <- levels(pdat$Class)
+
+singletons_summary <- data.table(x=sum(ll$n.singletons),n=total_number_singleton_mutations,class='Singletons')
+composites_summary <- data.table(x=sum(ll$n.composites),n=total_number_composite_mutations,class='Composite mutations')
+summary <- rbind(singletons_summary, composites_summary)
+max_prop_sing <- tail(pdat$value[pdat$Class=='Singleton_other'],1)
+max_prop_comp <- tail(pdat$value[pdat$Class=='Composite_other'],1)
+
+
+## plot
+FC1<-round(max(pdat$value[pdat$Class%in%"Composite_other"])/max(pdat$value[pdat$Class%in%"Singleton_other"]),2)
+ #Fold change
+FC2<-round(max(pdat$value[pdat$Class%in%"Composite_AID"])/max(pdat$value[pdat$Class%in%"Singleton_AID"]),2)
+
+
+## get data for inset plot
+
+
+
+p1 <- ggplot(pdat,aes(x=x.order)) +
+    geom_line(aes(x=x.order,y=value,color=Class),size=1) +
+    geom_text(label=paste0(pval_lab,"; FC=",FC1),data=pdat[1,],aes(x=80,y=0.275)) +  geom_text(label=paste0(pval_lab2,"; FC=",FC2),data=pdat[1,],aes(x=150,y=0.025)) +labs(x='Hotspot residues  \n(more frequent<----------------------->less frequent)',y='% of all mutations') + 
+    scale_y_continuous(expand=c(0,0),labels=scales::percent,limits=c(0,0.8)) +
+    scale_color_manual(values=cols,name=NULL,labels = c("Singletons other origin", "Composites other origin", "AICDA singletons","AICDA composites")) +
+    theme_std(base_size=14)+
+    xlim(c(0,800)) +
+    theme(legend.position='bottom')+geom_label_repel(data=pdat[c(2,3,5,9,1115,1121,2708,2724,2721,2939,2726),],position = position_dodge(width=0.9),aes(x = x.order, y = value+.01,label=hotspot), label.padding = unit(0.15, "lines"),segment.size = 0.1,hjust = 2,point.padding = 0.2,box.padding= unit(0.5, "lines"),label.size = 0.1,min.segment.length = 0,inherit.aes = F, show.legend = F)
+
+
+
+
+
+
+
+
+## get data for inset plot
+
+###Import data
+##Import data
+ci<-as.data.table(read.delim("Data/Figure5/Figure5c_2A.tab"))
+
+cols <- c('#979797','#1B89AD',"black","darkred")
+names(cols) <- levels(pdat$Class)
+pval2_lab<-"P=5e-29" #Calculated previously, for AICDA
+pval_lab<-"P=1e-08" #Calculated previously, for others
+ ci$mutation <- factor(ci$mutation,levels = c("Singleton_other","Composite_other","Singleton_AID","Composite_AID"))
+
+## plot
+p2 <- ggplot(ci,aes(x=type, y=mean)) +
+    geom_bar(stat='identity',aes(fill=mutation)) + 
+    geom_signif(comparison=list(c('Singleton','Composite')),annotation=pval_lab,y_position=35,tip_length = 0.01,color="#1B89AD") +
+  geom_signif(comparison=list(c('Singleton','Composite')),annotation=pval2_lab,y_position=37,tip_length = 0.01,color="darkred")+
+    scale_fill_manual(values=cols,name=NULL) + 
+    geom_errorbar(aes(min=lower,max=mean_plot),color='white',width=0) +
+    geom_errorbar(aes(min=mean_plot,max=upper),color='black',width=0) +
+    scale_y_continuous(expand=c(0,0),breaks=seq(0,40,by=5), labels=seq(0,40,by=5), limits=c(0,40), position='right') +
+    theme_std(base_size=14) +
+    theme(legend.position='none',axis.text.x=element_text(angle=0,hjust=0.5,vjust=0),plot.margin = margin(0.2, 3.5, 0.2, 3.5, "cm")) + 
+    coord_flip() + 
+    labs(x=NULL,y='% hotspots')
+
+## show the combined plot
+p <- plot_grid(p2, p1, rel_heights=c(1,4), ncol=1, nrow=2)
+p_hotspots_aicda_compo<-p
+p_hotspots_aicda_compo
+
+#ggsave(p_hotspots_aicda_compo,filename = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/Hotspots_AICDAcomposite.pdf",height = 10,width = 20)
+
+
+```
+
+
+***
+
+\pagebreak
+
+
+# Supplementary Figure 17c
+
+```{r  panel_Sup17c, fig.width=16,fig.height=12}
+
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+d <- fread(('Data/Figure5/Raw_calculations/gene_enrichment_AICDAmuts.txt')) 
+
+get_qqplot <- function(dat) {
+    # with influence from
+    # Kamil Slowikowski
+    # February 16, 2014
+    # https://slowkow.com/notes/ggplot2-qqplot/
+
+    N = nrow(dat)
+    ci <- 0.95
+    df <- data.table(observed=-log10(dat$p_enriched),
+                     expected=-log10(1:N/N),
+                     p=dat$p_enriched,
+                     q=dat$q_enriched,
+                     gene=dat$Hugo_Symbol,
+                     Role=dat$Role,
+                     cupper=-log10(qbeta(ci,1:N, N - 1:N + 1)),
+                     clower=-log10(qbeta(1 - ci, 1:N, N - 1:N + 1)))
+    df$Significance <- ifelse(df$q < 0.01,'q < 0.01','Not significant')
+    df$Significance <- factor(df$Significance,levels=c('q < 0.01','Not significant'))
+
+    df[Significance=='q < 0.01' & Role %nin% c('Oncogene','TSG'),Role:='Other']
+    df[Significance=='Not significant',Role:='Not significant']
+    df$Role <- factor(df$Role, levels=c('Oncogene','TSG','Other','Not significant'))
+
+    role_cols <- c('#EE7C65','#1B89AD','#58595B','#A6A5A4'); names(role_cols) <- levels(df$Role)
+    df$label <- df$gene
+    df$label[df$q >= 0.01] <- NA
+    df[p >= 1e-10 & label %nin% c('CDKN2A','FGFR3','FOXA1','ERBB4','PDGFRA',"EGFR","PTEN"),label:=NA]
+
+    ## make plot
+    log10Pe = expression(paste("Expected -log"[10], plain(P)))
+    log10Po = expression(paste("Observed -log"[10], plain(P)))
+    mycols <- c('#a6a6a6','#e50000')
+    names(mycols) <- c('Not significant','q < 0.01')
+    p <- ggplot(df,aes(x=expected,y=observed)) +
+        geom_point(pch=19, size=2.5, aes(color=Role)) +
+        geom_abline(intercept=0, slope=1, alpha=0.5) +
+        geom_line(aes(expected, cupper), linetype=2) +
+        geom_line(aes(expected, clower), linetype=2) +
+        scale_color_manual(values=role_cols) +
+        xlab(log10Pe) +
+        ylab(log10Po) +
+        geom_text_repel(aes(label=label), color='black', na.rm=T) +
+        theme_std(base_size=14)
+    p
+}
+
+p1 <- get_qqplot(d) +
+    theme(legend.position='none',axis.line.x=element_blank(),axis.ticks.x=element_blank(),axis.text.x=element_blank()) +
+    scale_y_continuous(limits=c(40,150),breaks=seq(50,150,by=50)) + 
+    labs(x=NULL,y=NULL) 
+    
+p2 <- get_qqplot(d[q_enriched > 0,]) + 
+    ylim(0,30) +
+    theme(legend.position='none')
+p1_legend <- extract_gglegend(get_qqplot(d))
+
+p <- plot_grid(p1,p2,rel_heights=c(1,3),align='v',ncol=1,nrow=2)
+xbp_grob <- ggplotGrob(p1_legend$legend)
+
+
+##Insert legend
+
+
+p_enrichment_genes<-p+annotation_custom(grob = xbp_grob,xmin = 0,xmax = .2,ymin = 0.75,ymax = 1)
+
+##Save table info
+#write.table(info,file = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/Gene_enrich_AICDAcomposite_byTumor.tab",quote = F,row.names = F,sep = "\t")
+
+p_enrichment_genes
+
+```
+
+
+***
+
+\pagebreak
+
+
+# Supplementary Figure 17f
+
+```{r  panelSup17f_cals,echo=T,eval=F,fig.show="hide"}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#####Figure H, Fraccion of phasable composite mutations
+## load phasing data and exclude duplicates from phasing data
+###THe loaded data already includes the AICDA tag, must have run the previous chunks...
+d_phased <- Composite_phased ###/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/Composite_phased_Mutations.maf
+
+d_phased$id <- paste(d_phased$mutationid.1,d_phased$mutationid.2,sep=' + ')
+d_phased <- d_phased[!duplicated(id),]
+
+d <- d_phased
+d <- d[exclude==F & putative_resistance_mutation.1==F & putative_resistance_mutation.2==F,]
+d$important.1 <- d$hotspot.1==T | d$oncogenic.1 %in% c('Oncogenic','Likely Oncogenic','Predicted Oncogenic') | (d$Role %in% c('TSG','Oncogene/TSG') & d$truncating.1==T)
+d$important.2 <- d$hotspot.2==T | d$oncogenic.2 %in% c('Oncogenic','Likely Oncogenic','Predicted Oncogenic') | (d$Role %in% c('TSG','Oncogene/TSG') & d$truncating.2==T)
+dd <- d[important.1==T | important.2==T,]
+
+####Define functions
+extract_cis_trans <- function(d) {
+    ## don't overcount multiple pairs of composite mutations in the same sample+gene+phase
+    d$id <- paste(d$Tumor_Sample_Barcode,d$Hugo_Symbol,d$phase)
+
+    ## don't overcount 3+ mutation composite-mutations; using unique sample/gene/Class counts
+    d <- d[!duplicated(id),c('Tumor_Sample_Barcode','metamaintype','Hugo_Symbol','Role','phase','id',
+                             'putative_resistance_mutation.1','putative_resistance_mutation.2',
+                             'HGVSp_Short.1','HGVSp_Short.2',
+                             'ccf_Mcopies.1','clonal.1','ccf_Mcopies.2','clonal.2','common_reads_alt1_alt2',
+                             'common_reads_alt1_ref2','common_reads_ref1_alt2','common_reads_ref1_ref2',
+                               't_depth.1','t_depth.2',"AICDA_mutation.1","AICDA_mutation.2","AICDA_present"),with=F]
+    d
+}##Add to extract AICDA_mutation.1 columns too
+quantify_gene2 <- function(d,AICDA=TRUE) {
+    ## count the instances of cis/trans per gene
+  if (AICDA==TRUE) {
+    cis_unique_samples_other <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$phase=='cis'&d$AICDA_present=="NO"],9)))
+    trans_unique_samples_other <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$phase=='trans'&d$AICDA_present=="NO"],9)))
+    cis_unique_samples_AID <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$phase=='cis'&d$AICDA_present=="YES"],9)))
+    trans_unique_samples_AID <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$phase=='trans'&d$AICDA_present=="YES"],9)))
+    z<-list(n.cis.other=cis_unique_samples_other,n.trans.other=trans_unique_samples_other,n.cis.AID=cis_unique_samples_AID,n.trans.AID=trans_unique_samples_AID)
+  }
+  if (AICDA==FALSE) {
+    cis_unique_samples <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$phase=='cis'],9)))
+    trans_unique_samples <- length(unique(strtrim(d$Tumor_Sample_Barcode[d$phase=='trans'],9)))
+    z<-list(n.cis=cis_unique_samples,n.trans=trans_unique_samples)
+  }
+    z
+}##Edit to have cis_AICDA, trans_AICDA,
+
+
+
+dd <- extract_cis_trans(dd)
+result <- dd[,quantify_gene2(.SD),by=c('Hugo_Symbol','Role')]
+
+result$percent_trans_other <- result$n.trans.other / (result$n.cis.other + result$n.trans.other+result$n.cis.AID + result$n.trans.AID)
+  result$percent_cis_other <- result$n.cis.other / (result$n.cis.other + result$n.trans.other+result$n.cis.AID + result$n.trans.AID)
+result$percent_trans_AID <- result$n.trans.AID / (result$n.cis.other + result$n.trans.other+result$n.cis.AID + result$n.trans.AID)
+  result$percent_cis_AID <- result$n.cis.AID / (result$n.cis.other + result$n.trans.other+result$n.cis.AID + result$n.trans.AID)
+
+  
+result <- result[order(percent_cis_other,decreasing = T),]
+result$total_phaseable <- result$n.cis.other + result$n.trans.other+result$n.cis.AID + result$n.trans.AID
+result <- result[total_phaseable > 2,]
+result <- result[Role %in% c('Oncogene','TSG'),]
+
+## exclude genes with evidence for depletion for composites
+gene_enrichment <- fread(('Data/Figure5/Raw_calculations/gene_enrichment_AICDAmuts.txt'))
+depleted <- gene_enrichment$Hugo_Symbol[gene_enrichment$q_twosided < 0.01 & gene_enrichment$logOR < 0]
+result <- result[Hugo_Symbol %nin% depleted,]
+
+
+```
+
+
+
+```{r panel_Sup17f, fig.width=18,fig.height=12}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+
+###Import data...
+
+result<-as.data.table(read.delim("Data/Figure5/FigureSup17f.tab"))
+
+cols <- c("#979797"   ,    "#1B89AD"     ,    "black"   ,    "darkred" )
+names(cols) <- c('trans_other','cis_other',"trans_AID","cis_AID")
+
+plot_phased <- function(res,min_phaseable=3) {
+    include_genes <- res$Hugo_Symbol[res$total_phaseable>=min_phaseable]
+    plot_dat_prop <- res[Hugo_Symbol %in% include_genes,c('Role','Hugo_Symbol','percent_cis_other','percent_trans_other',"percent_cis_AID","percent_trans_AID"),with=F]
+    plot_dat_prop <- melt(plot_dat_prop,id.var=c('Hugo_Symbol','Role'))
+    plot_dat_prop$variable <- gsub('percent_','',plot_dat_prop$variable)
+    plot_dat_prop$Hugo_Symbol <- factor(plot_dat_prop$Hugo_Symbol,levels=rev(include_genes))
+
+    plot_dat_freq <- res[Hugo_Symbol %in% include_genes,c('Role','Hugo_Symbol','n.cis.other','n.trans.other',"n.cis.AID","n.trans.AID"),with=F]
+    plot_dat_freq <- melt(plot_dat_freq,id.var=c('Hugo_Symbol','Role'))
+    plot_dat_freq$variable <- gsub('n[.]','',plot_dat_freq$variable)
+    plot_dat_freq$variable <- gsub('[.]','_',plot_dat_freq$variable)
+    plot_dat_freq$Hugo_Symbol <- factor(plot_dat_freq$Hugo_Symbol,levels=rev(include_genes))
+
+    #plot_dat <- merge(plot_dat_prop, plot_dat_freq, by=c('Role','Hugo_Symbol','variable'), all=T)
+    
+    plot_dat<-plot_dat_prop
+    plot_dat$Freq<-plot_dat_freq$value[match(paste(plot_dat$Hugo_Symbol,plot_dat$variable),paste(plot_dat_freq$Hugo_Symbol,plot_dat_freq$variable))]
+    names(plot_dat) <- c('Gene','Role','Phase','Prop','Freq')
+
+    ##########
+    plot_dat <- plot_dat[!is.na(Prop),]
+    plot_dat[Freq==0,Freq:=NA]
+
+    
+    tmp <- plot_dat[Phase=='cis_AID',]
+    tmp$Role <- factor(tmp$Role, levels=rev(c('Oncogene','TSG')))
+    tmp <- tmp[order(Prop,Freq,decreasing=T),]
+    gene_order <- rev(tmp$Gene)
+    plot_dat$Gene <- factor(plot_dat$Gene,levels=gene_order)
+
+    phase_col <- cols
+    #names(phase_col) <- tolower(names(phase_col))
+    text_col <- c('black','white')
+    names(text_col) <- c('cis','trans')
+    labels <- res[Hugo_Symbol %in% plot_dat$Gene,c('Role','Hugo_Symbol','total_phaseable'),with=F]
+    setnames(labels,'Hugo_Symbol','Gene')
+    labels$Gene <- factor(labels$Gene, levels=gene_order)
+    plot_dat$Phase<-factor(plot_dat$Phase,levels=c("trans_other", "trans_AID","cis_other", "cis_AID"))
+
+    p1 <- ggplot(plot_dat,aes(x=Gene,y=Prop)) +
+        geom_bar(stat='identity',aes(fill=Phase),width=0.9) +
+        scale_x_discrete(expand=c(0,0)) +
+        scale_y_continuous(expand=c(0,0),position='right',breaks=seq(0,1,by=0.2)) +scale_fill_manual(values=c( phase_col),name = "Composite mutation type", labels = c("Trans other origin", "Trans AICDA induced","Cis other origin","Cis AICDA induced"))+
+        labs(x=NULL,y='Frac. of phase-able composite mutations') +
+        theme_std(base_size=14) +
+        theme(axis.text.x=element_text(angle=0,vjust=0,hjust=1))
+    p1 <- extract_gglegend(p1)
+    p1.plot <- p1$plot + coord_flip()
+
+    y_info <- break_axis(labels$total_phaseable, maxlower=60, minupper=100, lowerticksize=20, upperticksize=100, ratio_lower_to_upper=3/4)
+    y_info$limits[2] <- y_info$limits[2] + 20
+
+    labels$newy <- y_info$newy
+    labels$label <- labels$total_phaseable
+    p3 <- ggplot(labels,aes(x=Gene,y=newy)) +
+        geom_bar(stat='identity',width=0.9) +
+        geom_text(aes(label=label,x=Gene,y=newy+10)) +
+        scale_x_discrete(expand=c(0,0)) +
+        scale_y_continuous(expand=c(0,0), limits=y_info$limits,breaks=y_info$breaks, labels=y_info$labels) +
+        labs(x=NULL,y='N',title=NULL) +
+        theme_std(base_size=14) +
+        theme(axis.line.y=element_blank(), axis.ticks.y=element_blank(), axis.text.y=element_blank(),
+                axis.text.x=element_text(angle=-90,hjust=0,vjust=0.5)) +
+        coord_flip()
+
+    p <- plot_grid(p1.plot,p3,ncol=2,nrow=1,align='h',rel_widths=c(5,1))
+    p <- plot_grid(p,p1$legend,ncol=1,nrow=2,rel_heights=c(5,1))
+    p
+}###Define plot function....edit from original to include AICDA proportions...
+
+p_phasable_perGene <- plot_phased(result,min_phaseable=10)
+p_phasable_perGene
+
+
+#write.table(plot_dat,file = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/AICDA_phase_perGene.tab",sep = "\t",quote = F,row.names = T)
+
+
+```
+
+
+***
+
+\pagebreak
+
+# Fig 5d
+
+```{r  panel5d_cals,echo=T,eval=F,fig.show="hide"}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+#####Figure 4I
+
+## load/prep PIK3CA composite mutation data for arcplot
+d <- Composite_phased
+d<-d[d$AICDA_present%in%"YES"]
+d <- d[Hugo_Symbol=='PIK3CA',c('Tumor_Sample_Barcode','Hugo_Symbol','HGVSp_Short.1','HGVSp_Short.2','Variant_Type.1','Variant_Type.2',
+          'Variant_Classification.1','Variant_Classification.2','phase','exclude'),with=F]
+d <- d[d$exclude==F & d$Variant_Classification.1=='Missense_Mutation' & d$Variant_Classification.2=='Missense_Mutation'
+       & Variant_Type.1=='SNP' & Variant_Type.2=='SNP',]
+info.1 <- HGVSp_Short_parse(d$HGVSp_Short.1)
+info.2 <- HGVSp_Short_parse(d$HGVSp_Short.2)
+d$Amino_Acid_Position.1 <- info.1$Amino_Acid_Position
+d$Amino_Acid_Position.2 <- info.2$Amino_Acid_Position
+d$HGVSp_Short.1 <- gsub('p[.]','',d$HGVSp_Short.1)
+d$HGVSp_Short.2 <- gsub('p[.]','',d$HGVSp_Short.2)
+d$index <- 1:nrow(d)
+d[,c('Variant_Type.1','Variant_Type.2','Variant_Classification.1','Variant_Classification.2'):=NULL]
+
+## swap order of mutations in composite
+reorder <- function(d) {
+    swap_order <- d$Amino_Acid_Position.1 > d$Amino_Acid_Position.2
+    if(swap_order) {
+        setnames(d,'HGVSp_Short.1','HGVSp_Short.2tmp')
+        setnames(d,'HGVSp_Short.2','HGVSp_Short.1')
+        setnames(d,'HGVSp_Short.2tmp','HGVSp_Short.2')
+        setnames(d,'Amino_Acid_Position.1','Amino_Acid_Position.2tmp')
+        setnames(d,'Amino_Acid_Position.2','Amino_Acid_Position.1')
+        setnames(d,'Amino_Acid_Position.2tmp','Amino_Acid_Position.2')
+    }
+    d
+}
+d <- d[,reorder(.SD),by=index]
+
+##This all the extra formating, everything else was already calculated on previous chunks...
+##Go to plotting section..
+
+
+
+
+```
+
+
+
+```{r panel_5d, fig.width=18,fig.height=12}
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+###Import data
+d<-as.data.table(read.delim("Data/Figure5/Figure5d.tab"))
+data_pfam<-"Data/Figure5/Raw_calculations/pik3ca_pfam_data.txt" ##This data was obtained from pfam database and contains information about the domains needed for correct representation of PIK3CA
+##Load enrichment data
+ x <- fread(('Data/Figure5/Raw_calculations/REsidue_enrichment_AICDA.tab'))
+ x <- x[query_gene=='PIK3CA',]
+ 
+ x<-x[x$q.value.enriched<0.01,]
+ x$HGVSp_Short<-gsub(x = x$query_mutation,pattern = "PIK3CA ",replacement = "")
+ x$HGVSp_Short<-substring(x$HGVSp_Short, 2)
+ enrich_labels<-d[d$Amino_Acid_Position.1%in%x$HGVSp_Short|d$Amino_Acid_Position.1%in%x$HGVSp_Short,]
+ enrich_labels$label<-paste0(enrich_labels$Amino_Acid_Position.1, " + ",enrich_labels$Amino_Acid_Position.2)
+ enrich_labels<-unique(enrich_labels$label)
+arcplot <- function(gene,dat,labels='',min.n=1,data_pfam=NULL) {
+
+    prepdata <- function(d) {
+        d$combo <- paste(d$Amino_Acid_Position.1,d$Amino_Acid_Position.2,sep=' + ')
+            count_samples <- function(d) {
+                ab <- length(unique(strtrim(d$Tumor_Sample_Barcode,9)))
+                list(ab=ab)
+            }
+        tbl <- d[,count_samples(.SD),by=combo]
+            info <- rbindlist(lapply(strsplit(as.character(tbl$combo),' [+] '),as.list))
+            names(info) <- c('Amino_Acid_Position.a','Amino_Acid_Position.b')
+            info$Amino_Acid_Position.a <- as.integer(info$Amino_Acid_Position.a)
+            info$Amino_Acid_Position.b <- as.integer(info$Amino_Acid_Position.b)
+            tbl <- cbind(tbl,info)
+            setnames(tbl,'combo','Comutation')
+            tbl$i <- 1:nrow(tbl)
+            tbl$x <- (tbl$Amino_Acid_Position.a + tbl$Amino_Acid_Position.b)/2
+            tbl$y <- tbl$ab
+            tbl <- tbl[order(tbl$Amino_Acid_Position.a,tbl$Amino_Acid_Position.b,decreasing=F),]
+            tbl$Comutation <- factor(tbl$Comutation,levels=tbl$Comutation)
+            tbl
+    }
+
+    dat <- prepdata(dat[dat$Hugo_Symbol==gene,])
+    dat <- dat[ab >= min.n,]
+    if(any(labels %in% dat$Comutation)) {
+        dat$label <- dat$Comutation
+        dat[label %nin% labels,label:=NA]
+    } else {
+        dat$label <- as.character(NA)
+    }
+    dat$i <- 1:nrow(dat)
+    if (is.null(data_pfam)) {
+      print("Data of domain coordinates from pfam not provided")
+    }
+    if (is.null(data_pfam)==FALSE) {
+      pfam <- fread((data_pfam))
+    }
+    
+    
+    l <- max(pfam$aa.length[pfam$Hugo_Symbol %in% gene])
+
+    ## include PFAM domain info
+    pf <- pfam[Hugo_Symbol == gene & !is.na(description),]
+    setnames(pf,'description','Domain')
+    setnames(pf,'pfam_start','Amino_Acid_Position.a')
+    setnames(pf,'pfam_end','Amino_Acid_Position.b')
+    pf <- pf[order(pf$Amino_Acid_Position.a,pf$Amino_Acid_Position.b,decreasing=F),]
+    A <- max(dat$ab)
+
+    ## set the size for domains and bar
+    segment.height <- A/10
+    domain.height <- A/10
+    segment.y= 0-segment.height/4
+    segment.y.end= 0+segment.height/4
+    domain.y= 0-domain.height/2
+    domain.y.end= 0+domain.height/2
+    xmin = 0
+
+    ## get the arcs to plot connections
+    get_arcs <- function(d) {
+        maxima <- d$ab[1]
+        if(d$Amino_Acid_Position.a[1] != d$Amino_Acid_Position.b[1]) {
+            x <- seq(d$Amino_Acid_Position.a[1],d$Amino_Acid_Position.b[1],by=0.05)
+            xrange <- max(x)-min(x)
+            cosx <- cos(pi*(x-min(x))/(2*xrange))
+            pos.x <- xrange*(cosx^2)+min(x)
+            lx <- length(x)
+            y <- pi*seq(1,lx)/lx
+            pos.y <- maxima*(sin(y)*sin(y))
+        } else {
+            pos.x <- as.numeric(rep(d$Amino_Acid_Position.a[1],21))
+            y <- seq(0,1,by=0.05)
+            pos.y <- maxima*y
+        }
+        pos.data <- data.table(pos.x=pos.x, pos.y=pos.y)
+        pos.data
+    }
+
+    f <- function(d) {
+        x1=min(d$pos.x)
+        x2=max(d$pos.x)
+        list(x1=x1,x2=x2)
+    }
+    arc <- dat[,get_arcs(.SD),by=c('i','Comutation')]
+    dotpos <- arc[,f(.SD),by=c('Comutation')]
+    dotpos <- melt(dotpos,id.var=c('Comutation'))
+    dotpos[,variable:=NULL]
+    setnames(dotpos,'value','x')
+    dotpos$enriched <- dotpos$Comutation %in% labels
+    mycols <- brewer.pal(12,'Paired')
+    mycols[11] <- 'grey30'
+
+    ## make residue Comutation plot
+    p <- ggplot(data=dat) +
+        theme_classic(base_size=18) +
+        labs(x=NULL,y=NULL) +
+        geom_rect(xmin=xmin, xmax = l, ymin=segment.y, ymax=segment.y.end, fill='#999999') +
+        scale_y_continuous(breaks=seq(0,(round(1.25*A)+1),by=2),limits=c(-0.5,1.25*A),name="Number of AICDA composite mutations") +
+        scale_x_continuous(breaks=seq(0,pmax(100, round(l, -2L)),100),limits=c(0,l)) #round end to next hundred value
+
+    
+    if(nrow(pf)>0) p <- p + geom_rect(data=pf, aes(xmin=Amino_Acid_Position.a, xmax=Amino_Acid_Position.b, fill=Domain), ymin=domain.y, ymax=domain.y.end)
+    p <- p + geom_point(data=dotpos[enriched==F],aes(x=x),color='darkgrey',y=0,pch=19,size=0.2,alpha=0.5)
+    p <- p + geom_point(data=dotpos[enriched==T],aes(x=x),color='black',y=0,pch=19,size=0.2)
+    for(r in dat$i[is.na(dat$label)])  p <- p + geom_line(data=arc[arc$i==r,],aes(x=pos.x,y=pos.y),color='darkgray',size=0.8,alpha=0.5)
+    for(r in dat$i[!is.na(dat$label)]) p <- p + geom_line(data=arc[arc$i==r,],aes(x=pos.x,y=pos.y),color='black',size=0.8,alpha=1)
+    if(any(!is.na(dat$label))) p <- p + geom_text_repel(aes(x=x,y=y,label=label),color='black',na.rm=T,size=4)
+    p <- p + scale_fill_brewer(palette='Paired') +
+    theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.line.x=element_blank(),
+          legend.position='bottom')
+    p
+} #edit
+
+## get arcplot
+p_arcplot <- arcplot('PIK3CA',d,min.n=2,data_pfam = data_pfam,labels = c("542 + 726","88 + 1047","726 + 1047","542 + 545","545 + 726"))
+
+## add tracks for 1) number of samples with mutations at residue and 2) enrichment for composites at residue
+x <- fread(('Data/Figure5/Raw_calculations/REsidue_enrichment_AICDA.tab'))
+ x <- x[query_gene=='PIK3CA',]
+
+#x<-x[,-1]
+x$n_mutated <- x$n.samples_with_singleton_mutation_including_residue + x$n.samples_with_composite_mutation_including_residue
+x$n_composite_mutated <- x$n.samples_with_composite_mutation_including_residue
+x$p <- x$p.value.enriched
+x$q <- x$q.value.enriched
+x <- x[grepl('indel',x$query_mutation)==F & grepl('fs',x$query_mutation)==F & grepl('[*]',x$query_mutation)==F & grepl('X',x$query_mutation)==F,]
+x$pos <- as.integer(substr(x$query_mutation,9,nchar(x$query_mutation)))
+info <- x[,c('pos','query_mutation','n_mutated','n_composite_mutated','p','q'),with=F]
+info <- info[order(p,decreasing=F),]
+
+## make table of mutant-samples and enrichment per residue of PIK3A, merge with peptide sequence Human (https://www.uniprot.org/uniprot/P42336.fasta), 1068 aa
+protein_sequence <- 'MPPRPSSGELWGIHLMPPRILVECLLPNGMIVTLECLREATLITIKHELFKEARKYPLHQLLQDESSYIFVSVTQEAEREEFFDETRRLCDLRLFQPFLKVIEPVGNREEKILNREIGFAIGMPVCEFDMVKDPEVQDFRRNILNVCKEAVDLRDLNSPHSRAMYVYPPNVESSPELPKHIYNKLDKGQIIVVIWVIVSPNNDKQKYTLKINHDCVPEQVIAEAIRKKTRSMLLSSEQLKLCVLEYQGKYILKVCGCDEYFLEKYPLSQYKYIRSCIMLGRMPNLMLMAKESLYSQLPMDCFTMPSYSRRISTATPYMNGETSTKSLWVINSALRIKILCATYVNVNIRDIDKIYVRTGIYHGGEPLCDNVNTQRVPCSNPRWNEWLNYDIYIPDLPRAARLCLSICSVKGRKGAKEEHCPLAWGNINLFDYTDTLVSGKMALNLWPVPHGLEDLLNPIGVTGSNPNKETPCLELEFDWFSSVVKFPDMSVIEEHANWSVSREAGFSYSHAGLSNRLARDNELRENDKEQLKAISTRDPLSEITEQEKDFLWSHRHYCVTIPEILPKLLLSVKWNSRDEVAQMYCLVKDWPPIKPEQAMELLDCNYPDPMVRGFAVRCLEKYLTDDKLSQYLIQLVQVLKYEQYLDNLLVRFLLKKALTNQRIGHFFFWHLKSEMHNKTVSQRFGLLLESYCRACGMYLKHLNRQVEAMEKLINLTDILKQEKKDETQKVQMKFLVEQMRRPDFMDALQGFLSPLNPAHQLGNLRLEECRIMSSAKRPLWLNWENPDIMSELLFQNNEIIFKNGDDLRQDMLTLQIIRIMENIWQNQGLDLRMLPYGCLSIGDCVGLIEVVRNSHTIMQIQCKGGLKGALQFNSHTLHQWLKDKNKGEIYDAAIDLFTRSCAGYCVATFILGIGDRHNSNIMVKDDGQLFHIDFGHFLDHKKKKFGYKRERVPFVLTQDFLIVISKGAQECTKTREFERFQEMCYKAYLAIRQHANLFINLFSMMLGSGMPELQSFDDIAYIRKTLALDKTEQEALEYFMKQMNDAHHGGWTTKMDWIFHTIKQHALN'
+l<-1068 #
+out <- data.table(position=1:l,aa=strsplit(protein_sequence,'')[[1]])
+out$residue <- paste(out$aa,out$position,sep='')
+out[,aa:=NULL]
+out <- merge(out,info,by.x='position',by.y='pos', all.x=T)
+out[,query_mutation:=NULL]
+out[is.na(n_mutated),n_mutated:=0]
+out[is.na(n_composite_mutated),n_composite_mutated:=0]
+out[is.na(p),p:=1]
+out[is.na(q),q:=1]
+out[q < 1 & q >= 0.01,q:=1] ## force not-significant q-values to have q=1 so that they are clearer in the track accompanying the arcplot
+out$nlog10q <- -log10(out$q)
+
+maxN <- max(out$n_mutated,na.rm=T)
+minQ <- prettyNum(min(out$q,na.rm=T),digits=1)
+
+## track1: number of unique samples with mutation per residue
+p_track1 <- ggplot(data=out,aes(x=position,y=0)) + 
+    geom_segment(aes(x=position,xend=position,color=n_mutated),y=0,yend=1) +
+    labs(x=NULL,y=paste0('N mutated: (0-',maxN,')')) +
+    scale_color_gradient(low='white',high='black' ,name="") +
+    theme_std(base_size=14) +
+    theme(axis.title.y=element_text(angle=0,hjust=0,vjust=0.5),axis.line.y=element_blank(),
+          axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.line.x=element_blank(),legend.box = "horizontal")
+
+
+## track2: enrichment 
+p_track2 <- ggplot(data=out,aes(x=position,y=0)) + 
+    geom_segment(aes(x=position,xend=position,color=nlog10q),y=0,yend=1) +
+    ylim(c(-1,1)) +
+    labs(x='Amino acid position',y=paste0('Q-value, composite-mutant: (1-',minQ,')')) +
+    scale_color_gradient(low='white',high='black',name="") +
+    theme_std(base_size=14) +
+    theme(axis.title.y=element_text(angle=0,hjust=0,vjust=2/3), axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.line.y=element_blank())+scale_x_continuous(breaks=seq(0,pmax(100, round(l, -2L)),100),limits=c(0,l))
+
+## get plot
+
+p_arcplot <- extract_gglegend(p_arcplot)
+legend_b <- get_legend(p_track1+ theme(legend.position="bottom",legend.title = element_text(size = 9),legend.key.size = unit(0.5, "cm"),legend.text = element_text(size = 7)))
+legend_c <- get_legend(p_track2+ theme(legend.position="bottom",legend.title = element_text(size = 9),legend.key.size = unit(0.5, "cm"),legend.text = element_text(size = 7)))
+p_track1 <- extract_gglegend(p_track1)
+p_track2 <- extract_gglegend(p_track2)
+p <- plot_grid(plotlist=list(p_arcplot$plot, p_track1$plot, p_track2$plot), align='v', ncol=1, nrow=3, rel_heights=c(6,1,2.5))
+p <- plot_grid(p, p_arcplot$legend, ncol=1, nrow=2, rel_heights=c(6,1))
+###Put the other legends
+
+# add the legend underneath the row we made earlier. Give it 10% of the height
+# of one plot (via rel_heights).
+
+
+###Annotate with specific position for the legends to improve visualization...
+
+
+
+p_PIK3CA_protein<-p+annotation_custom(grob = legend_b,xmin = 0,xmax = .38,ymin = -.18,ymax = 1)+annotation_custom(grob = legend_c,xmin = 0,xmax = .48,ymin = -0.4,ymax = 1)
+
+
+p_PIK3CA_protein
+```
+
+
+***
+
+\pagebreak
