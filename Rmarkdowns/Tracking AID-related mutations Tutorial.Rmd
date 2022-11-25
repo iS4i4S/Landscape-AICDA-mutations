@@ -1,0 +1,71 @@
+---
+title: "Tracking AID-related mutations"
+author: 
+  - name: "Isaias Hernandez-Verdin, MSc, PhD."
+    affiliation: "Institut du Cerveau-Paris Brain Institute-ICM, Inserm, Sorbonne Université, CNRS, APHP, Hôpital de la Pitié Salpêtrière, Paris, France"
+    email: "isaias.hernandez@icm-institute.org"
+date: "25/11/2022"
+output: 
+    BiocStyle::html_document:
+      toc: true
+      toc_float: true
+      number_sections: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, autodep = knitr::dep_prev())
+```
+
+# Introduction
+
+AID (encoded by AICDA) is involved in the diversification of the variable (V) or switch domains of immunoglobulin (IG) genes during the G1-S phases of the cell cycle. It is responsible for somatic hypermutation in the dark zone of the GC and class switch recombination in the light zone. AID deamination of cytosine to uracil also occurs during IG gene transcription and inside particular DNA patterns. Mutations can arise as A->C at WA motifs (W = A/T) when resolved by the error-prone DNA polymerase-eta, which has been defined as non-canonical AID (COSMIC signature 9), or as C->T/G at WRCY motifs (R = purine; Y = pyrimidine) when resolved by base excision repair or mismatch repair pathways, which has been defined as canonical-AID. 
+
+The code was developed takes a maf (mutation annotation format) object as input and outputs an S3 class object containing:
+
+1. A matrix of the 768 possible tetranucleotide substitutions across the samples
+2. A data table with all the needed values for enrichment calculation, the enrichment score, Fisher exact-test p-value and FDR for enrichment, the fraction of AID mutations, among others.
+3. A maf-like data table, with the same format as the input, containing only the attributed AID mutations.
+
+
+# Load Example 
+
+Load an example of mutation data provided here.
+
+```{r  example,echo=T,eval=T,fig.show="hide"}
+###"/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/data/data_mutations_signature_attribution.txt.gz" signatures
+library(maftools)
+##Download data from: https://github.com/taylor-lab/composite-mutations/tree/master/data/data_mutations.txt.gz
+##Import data
+data_dir<-"/media/user/seagate_ICM/AICDA_analysis/Github_repository/" #Set to where you downloaded the data
+setwd(data_dir)
+source("r/prerequisites.R")
+Composite_maf<-read.maf(maf = "/media/user/seagate_ICM/AICDA_analysis/Composite_mutations/data/data_mutations.txt.gz")
+length(unique(Composite_maf@data$Tumor_Sample_Barcode))
+#31353
+Composite_maf<-subsetMaf(Composite_maf,tsb = unique(Composite_maf@data$Tumor_Sample_Barcode)) #Eliminate duplicates
+length(table(Composite_maf@data$metamaintype))#41 tumor types
+
+
+```
+
+
+# Track AID mutations
+
+```{r,echo=T,eval=T}
+##Calculate AICDA and APOBEC mutations
+
+load("r/AICDA_enrich_function_WES_WGS.RData") ##Change where you downloaded the functions...
+load("r/APOBEC_enrich_function_WES_WGS.RData") ##Change where you downloaded the functions...
+Composite_AICDA<-AICDA_enrichment(Composite_maf, ref_genome = "BSgenome.Hsapiens.UCSC.hg19",prefix = 'chr', add = TRUE, background_n = 60,seq_type = "WGS") #Add the WGS flag to get silent mutations too
+
+head(Composite_AICDA)
+
+```
+
+# Session Information
+
+```{r}
+sessionInfo()
+```
