@@ -71,7 +71,7 @@ The code was developed under R, takes a maf (mutation annotation format) object 
 - ii) A data table with all the needed values for enrichment calculation, the enrichment score, Fisher exact-test p-value and FDR for enrichment, the fraction of AID mutations, among others. 
 - iii) A maf-like data table, with the same format as the input, containing only the attributed AID mutations. 
 
-You can visualize an html example of using this function: [AID-enrichment tutorial](https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Tracking-AID-related-mutations-Tutorial.html).
+You can visualize an html example of using this function: [AID-enrichment tutorial](http://htmlpreview.github.io/?https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Rmarkdowns/Tracking-AID-related-mutations-Tutorial.html).
 
 
 ### Contact
