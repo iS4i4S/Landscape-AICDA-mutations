@@ -1,5 +1,0 @@
-method	x	n	mean	lower	upper	role	first
-exact	19	26	NA	NA	NA	Oncogene	No
-exact	19	26	73.0769230769231	52.2125210306169	88.4267786708496	Oncogene	Yes
-exact	15	28	NA	NA	NA	TSG	No
-exact	15	28	53.5714285714286	33.86990761146	72.4891439703404	TSG	Yes
