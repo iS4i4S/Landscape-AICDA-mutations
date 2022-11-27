@@ -1,6 +1,6 @@
 # Landscape of AID-related mutations
 Code for reproducing analysis on the paper "Pan-cancer landscape of AID-related mutations, composite mutations and their potential role in the ICI response".
-![alt text](https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Data/Pan-cancer%20landscape%20of%20AID%20mutations.jpeg "Hi there!")
+![alt text](https://github.com/iS4i4S/Landscape-AICDA-mutations/blob/main/Data/Graphical_abstract.jpg "Hi there!")
 
 ### Abstract
 
