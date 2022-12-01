@@ -9,8 +9,8 @@ Activation-induced cytidine deaminase, AICDA or AID, is a driver of somatic hype
 ### Citation
 If you use any data or code derived from this study, please cite:
 
-- .......(missing citation) 
-- DOI: [10.1038/s41698-022-00331-2](insertLink later)
+- Hernández-Verdin, I., Akdemir, K.C., Ramazzotti, D. et al. Pan-cancer landscape of AID-related mutations, composite mutations, and their potential role in the ICI response. npj Precis. Onc. 6, 89 (2022).
+- DOI: [10.1038/s41698-022-00331-2](https://www.nature.com/articles/s41698-022-00331-2)
 
 
 ### Instructions
